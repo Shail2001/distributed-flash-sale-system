@@ -1,0 +1,46 @@
+# Compiled binaries
+services/*/server
+services/flash-sale-api/flash-sale-api
+*.exe
+*.out
+
+# Go build artifacts
+vendor/
+*/vendor/
+
+# Environment & secrets — NEVER commit these
+.env
+.env.*
+*.env
+.aws/
+*.pem
+*.key
+ghp_*
+
+# Claude Code internals
+.claude/
+CLAUDE_CODE_PROMPT.md
+CLAUDE_CODE_RESTRUCTURE.md
+*_PROMPT.md
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.cursor/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test binaries
+*.test
+tests/*/tests
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl
+terraform/terraform.tfvars
