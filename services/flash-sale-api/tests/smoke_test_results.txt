@@ -1,0 +1,38 @@
+=== FLASH SALE API SMOKE TEST RESULTS ===
+Date: Mon Mar 30 09:27:54 EDT 2026
+
+--- Step 2.1: Reset inventory ---
+{"status":"reset","remaining":100}
+--- Step 2.2: Check inventory after reset ---
+{"item_id":"flash-sale-item","remaining":100,"sold_out":false}
+--- Step 2.3: Health check ---
+{"status":"healthy","remaining":100}
+--- Step 2.4: Single purchase ---
+{"order_id":"b105727c-0c47-4095-97d4-bab153d01c59","customer_id":"test-customer-1","status":"accepted","remaining_inventory":99}
+HTTP_STATUS:201
+--- Step 2.5: Verify inventory decremented ---
+{"item_id":"flash-sale-item","remaining":99,"sold_out":false}
+--- Step 2.6: Make 9 more purchases ---
+{"order_id":"c18a4891-e2de-4faa-8dab-50c2c8450c1b","customer_id":"test-customer-2","status":"accepted","remaining_inventory":98}
+{"order_id":"ce06de57-9cc0-4836-b266-3e48a2a16f28","customer_id":"test-customer-3","status":"accepted","remaining_inventory":97}
+{"order_id":"bb7abdc6-7c51-4557-8e5e-5f93a63d29ca","customer_id":"test-customer-4","status":"accepted","remaining_inventory":96}
+{"order_id":"2441014f-b034-448c-be0f-b83c25f943aa","customer_id":"test-customer-5","status":"accepted","remaining_inventory":95}
+{"order_id":"8797db78-231f-4246-a856-6a86ce0026f0","customer_id":"test-customer-6","status":"accepted","remaining_inventory":94}
+{"order_id":"df170ba8-0fc3-4897-87c9-9f3b77162d07","customer_id":"test-customer-7","status":"accepted","remaining_inventory":93}
+{"order_id":"9f0986ad-83a1-4ba1-b8d7-1b60d79eb20f","customer_id":"test-customer-8","status":"accepted","remaining_inventory":92}
+{"order_id":"dcf0914a-2e18-4617-859f-13dc3701f51f","customer_id":"test-customer-9","status":"accepted","remaining_inventory":91}
+{"order_id":"b34824cb-15e0-4f95-b084-16e4104ba40b","customer_id":"test-customer-10","status":"accepted","remaining_inventory":90}
+--- Step 2.7: Check inventory = 90 ---
+{"item_id":"flash-sale-item","remaining":90,"sold_out":false}
+--- Step 2.8: Test invalid request (missing customer_id) ---
+{"error":"invalid request","message":"Key: 'purchaseRequest.CustomerID' Error:Field validation for 'CustomerID' failed on the 'required' tag"}
+HTTP_STATUS:400
+--- Step 2.9: Reset and drain all inventory ---
+{"status":"reset","remaining":100}
+(Draining 100 items...)
+Drain complete.
+--- Step 2.10: Attempt purchase when sold out ---
+{"error":"SOLD_OUT","message":"No inventory remaining"}
+HTTP_STATUS:409
+--- Step 2.11: Verify inventory shows sold_out: true ---
+{"item_id":"flash-sale-item","remaining":0,"sold_out":true}

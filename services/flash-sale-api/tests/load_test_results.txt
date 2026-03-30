@@ -1,0 +1,13 @@
+=== RUN   TestConcurrentPurchases
+
+=== CONCURRENCY TEST RESULTS ===
+Total requests:  200
+Accepted (201):  100
+Rejected (409):  100
+Errors:          0
+Oversell:        false
+================================
+
+--- PASS: TestConcurrentPurchases (0.28s)
+PASS
+ok  	tests	0.584s

@@ -1,0 +1,17 @@
+
+=== CONCURRENCY TEST RESULTS ===
+Total requests:  200
+Accepted (201):  100
+Rejected (409):  100
+Errors:          0
+Oversell:        false
+================================
+
+goos: darwin
+goarch: arm64
+pkg: tests
+cpu: Apple M4
+BenchmarkPurchase-10     	    9372	   2399718 ns/op	   19627 B/op	     144 allocs/op
+BenchmarkInventory-10    	   15792	   1083262 ns/op	   17111 B/op	     125 allocs/op
+PASS
+ok  	tests	48.288s
