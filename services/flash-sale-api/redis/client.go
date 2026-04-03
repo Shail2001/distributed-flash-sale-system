@@ -18,14 +18,24 @@ func NewClient(endpoint, port string) *redis.Client {
 // Returns the new value after decrement.
 // Caller must check: if result < 0, sold out → INCR back and return 409.
 func DecrInventory(ctx context.Context, rdb *redis.Client, itemID string) (int64, error) {
+	return DecrInventoryBy(ctx, rdb, itemID, 1)
+}
+
+// DecrInventoryBy atomically decrements the inventory counter by quantity.
+func DecrInventoryBy(ctx context.Context, rdb *redis.Client, itemID string, quantity int) (int64, error) {
 	key := fmt.Sprintf("inventory:%s", itemID)
-	return rdb.Decr(ctx, key).Result()
+	return rdb.DecrBy(ctx, key, int64(quantity)).Result()
 }
 
 // IncrInventory increments the counter back — used to correct a negative value on sold-out.
 func IncrInventory(ctx context.Context, rdb *redis.Client, itemID string) error {
+	return IncrInventoryBy(ctx, rdb, itemID, 1)
+}
+
+// IncrInventoryBy increments the counter back by quantity after a failed attempt.
+func IncrInventoryBy(ctx context.Context, rdb *redis.Client, itemID string, quantity int) error {
 	key := fmt.Sprintf("inventory:%s", itemID)
-	return rdb.Incr(ctx, key).Err()
+	return rdb.IncrBy(ctx, key, int64(quantity)).Err()
 }
 
 // GetInventory reads the current counter without modifying it.

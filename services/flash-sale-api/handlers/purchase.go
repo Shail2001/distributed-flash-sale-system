@@ -40,8 +40,8 @@ func (h *Handler) Purchase(c *gin.Context) {
 	const itemID = "flash-sale-item"
 
 	// Step 1: Atomic DECR — this is the entire point of Redis here.
-	// Do NOT read-check-write. Just DECR and inspect the result.
-	remaining, err := redisclient.DecrInventory(ctx, h.rdb, itemID)
+	// Do NOT read-check-write. Decrement by the requested quantity and inspect the result.
+	remaining, err := redisclient.DecrInventoryBy(ctx, h.rdb, itemID, req.Quantity)
 	if err != nil {
 		log.Printf("Redis DECR error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "redis error"})
@@ -50,7 +50,7 @@ func (h *Handler) Purchase(c *gin.Context) {
 
 	// Step 2: If negative → sold out. INCR back to prevent counter going below 0.
 	if remaining < 0 {
-		if incrErr := redisclient.IncrInventory(ctx, h.rdb, itemID); incrErr != nil {
+		if incrErr := redisclient.IncrInventoryBy(ctx, h.rdb, itemID, req.Quantity); incrErr != nil {
 			log.Printf("Redis INCR correction error: %v", incrErr)
 		}
 		c.JSON(http.StatusConflict, soldOutResponse{
@@ -66,7 +66,7 @@ func (h *Handler) Purchase(c *gin.Context) {
 	if err := h.publisher.PublishOrder(ctx, orderID, req.CustomerID, itemID, req.Quantity); err != nil {
 		// SQS publish failed — roll back the DECR so inventory stays consistent.
 		log.Printf("SQS publish error for order %s: %v — rolling back DECR", orderID, err)
-		if incrErr := redisclient.IncrInventory(ctx, h.rdb, itemID); incrErr != nil {
+		if incrErr := redisclient.IncrInventoryBy(ctx, h.rdb, itemID, req.Quantity); incrErr != nil {
 			log.Printf("Redis rollback INCR error: %v", incrErr)
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue order"})
