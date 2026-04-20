@@ -1,0 +1,34 @@
+=== WAITING ROOM SMOKE TEST RESULTS ===
+Date: April 2026
+Environment: Windows 11, localhost, Redis 7-alpine
+
+--- All endpoint tests ---
+TestHealth                PASS
+TestJoinAssignsPosition   PASS
+TestJoinIdempotent        PASS
+TestSequentialPositions   PASS
+TestPositionNotFound      PASS
+TestPositionMissingParam  PASS
+TestJoinBadRequest        PASS
+TestAdmissionToken        PASS (admitted in 0.22s, token issued)
+TestReset                 PASS
+
+--- Experiment 1 — Strategy A: timestamp-only ---
+Strategy:                 timestamp
+Total users:              100
+Unique positions:         99
+Collisions:               1 (1.0%)
+Result:                   PASS (collisions expected for Strategy A)
+Note:                     Collision rate will increase under higher concurrency
+                          and across multiple ECS replicas on AWS
+
+--- Experiment 1 — Strategy B: timestamp + Redis INCR tiebreaker ---
+Strategy:                 timestamp_incr
+Total users:              100
+Unique positions:         100
+Collisions:               0 (0.0%)
+Result:                   PASS (zero collisions required for Strategy B)
+Note:                     INCR tiebreaker guarantees globally unique scores
+                          even across multiple ECS replicas
+
+Total: 10/10 tests passing across both strategies

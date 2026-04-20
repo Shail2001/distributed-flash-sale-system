@@ -13,11 +13,6 @@ variable "environment" {
   default = "dev"
 }
 
-variable "waiting_room_image" {
-  type    = string
-  default = "125878857213.dkr.ecr.us-east-1.amazonaws.com/flash-sale-waiting-room:latest"
-}
-
 variable "flash_sale_api_image" {
   type    = string
   default = "125878857213.dkr.ecr.us-east-1.amazonaws.com/flash-sale-api:latest"
@@ -27,6 +22,12 @@ variable "order_worker_image" {
   type    = string
   default = "125878857213.dkr.ecr.us-east-1.amazonaws.com/flash-sale-order-worker:latest"
 }
+
+# Waiting room image — uncomment when service is built
+# variable "waiting_room_image" {
+#   type    = string
+#   default = "125878857213.dkr.ecr.us-east-1.amazonaws.com/flash-sale-waiting-room:latest"
+# }
 
 variable "inventory_count" {
   type        = number

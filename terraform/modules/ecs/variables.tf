@@ -1,35 +1,34 @@
 variable "project" { type = string }
 variable "aws_region" { type = string }
-variable "private_subnet_ids" { type = list(string) }
+variable "subnet_ids" { type = list(string) }
 variable "ecs_security_group_id" { type = string }
 
-# Images
-variable "waiting_room_image" { type = string }
+# Container images
 variable "flash_sale_api_image" { type = string }
 variable "order_worker_image" { type = string }
+variable "waiting_room_image" { type = string }  
 
-# ALB
-variable "waiting_room_target_group_arn" { type = string }
+# ALB target groups
 variable "flash_sale_api_target_group_arn" { type = string }
-variable "alb_listener_arn" { type = string }
+variable "waiting_room_target_group_arn" { type = string } 
 
-# Config - these are the Experiment 3 sweep variables
-variable "admission_rate" {
-  type        = number
-  default     = 10
-  description = "Users admitted per second from waiting room"
-}
-
+# Experiment variables — change these between runs, no rebuild needed
 variable "inventory_count" {
   type        = number
   default     = 100
-  description = "Starting inventory for flash sale"
+  description = "Starting inventory count"
 }
 
 variable "order_worker_goroutines" {
   type        = number
   default     = 20
-  description = "Goroutines in order worker"
+  description = "NUM_WORKERS — Experiment 3 sweep: 20 / 40 / 80"
+}
+
+variable "admission_rate" {
+  type        = number
+  default     = 10
+  description = "Admission rate/sec — Experiment 3 sweep: 2 → 100"
 }
 
 # Downstream resource references
@@ -40,6 +39,6 @@ variable "dynamodb_orders_table" { type = string }
 variable "dynamodb_inventory_table" { type = string }
 
 # Log groups
-variable "waiting_room_log_group" { type = string }
 variable "flash_sale_api_log_group" { type = string }
 variable "order_worker_log_group" { type = string }
+variable "waiting_room_log_group" { type = string } 

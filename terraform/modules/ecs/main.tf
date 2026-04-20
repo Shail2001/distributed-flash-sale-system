@@ -1,82 +1,17 @@
-# ECS Cluster
 resource "aws_ecs_cluster" "this" {
   name = "${var.project}-cluster"
-
   setting {
     name  = "containerInsights"
-    value = "enabled" # Enables CloudWatch Container Insights for detailed metrics
+    value = "enabled"
   }
-
   tags = { Name = "${var.project}-cluster" }
 }
 
-# IAM Role
 data "aws_iam_role" "lab_role" {
   name = "LabRole"
 }
 
-# Waiting Room Service
-resource "aws_ecs_task_definition" "waiting_room" {
-  family                   = "${var.project}-waiting-room"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"
-  memory                   = "512"
-  execution_role_arn       = data.aws_iam_role.lab_role.arn
-  task_role_arn            = data.aws_iam_role.lab_role.arn
-
-  container_definitions = jsonencode([{
-    name      = "waiting-room"
-    image     = var.waiting_room_image
-    essential = true
-
-    portMappings = [{ containerPort = 8080 }]
-
-    environment = [
-      { name = "REDIS_ENDPOINT", value = var.redis_endpoint },
-      { name = "REDIS_PORT",     value = "6379" },
-      { name = "ADMISSION_RATE", value = tostring(var.admission_rate) },
-      { name = "APP_PORT",       value = "8080" },
-    ]
-
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = var.waiting_room_log_group
-        "awslogs-region"        = var.aws_region
-        "awslogs-stream-prefix" = "ecs"
-      }
-    }
-  }])
-}
-
-resource "aws_ecs_service" "waiting_room" {
-  name            = "${var.project}-waiting-room"
-  cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.waiting_room.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
-
-  network_configuration {
-    subnets          = var.private_subnet_ids
-    security_groups  = [var.ecs_security_group_id]
-    assign_public_ip = false
-  }
-
-  load_balancer {
-    target_group_arn = var.waiting_room_target_group_arn
-    container_name   = "waiting-room"
-    container_port   = 8080
-  }
-
-  depends_on = [var.alb_listener_arn]
-
-  lifecycle {
-    ignore_changes = [desired_count] # Let auto-scaling manage count
-  }
-}
-
-# Flash Sale API
+# ── Flash Sale API ─────────────────────────────────────────────────────────────
 resource "aws_ecs_task_definition" "flash_sale_api" {
   family                   = "${var.project}-api"
   network_mode             = "awsvpc"
@@ -90,18 +25,15 @@ resource "aws_ecs_task_definition" "flash_sale_api" {
     name      = "flash-sale-api"
     image     = var.flash_sale_api_image
     essential = true
-
     portMappings = [{ containerPort = 8080 }]
-
     environment = [
-      { name = "REDIS_ENDPOINT",   value = var.redis_endpoint },
-      { name = "REDIS_PORT",       value = "6379" },
-      { name = "SQS_QUEUE_URL",    value = var.sqs_queue_url },
-      { name = "INVENTORY_COUNT",  value = tostring(var.inventory_count) },
-      { name = "AWS_REGION",       value = var.aws_region },
-      { name = "APP_PORT",         value = "8080" },
+      { name = "REDIS_ENDPOINT",  value = var.redis_endpoint },
+      { name = "REDIS_PORT",      value = "6379" },
+      { name = "SQS_QUEUE_URL",   value = var.sqs_queue_url },
+      { name = "INVENTORY_COUNT", value = tostring(var.inventory_count) },
+      { name = "AWS_REGION",      value = var.aws_region },
+      { name = "APP_PORT",        value = "8080" },
     ]
-
     logConfiguration = {
       logDriver = "awslogs"
       options = {
@@ -121,9 +53,9 @@ resource "aws_ecs_service" "flash_sale_api" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = var.private_subnet_ids
+    subnets          = var.subnet_ids
     security_groups  = [var.ecs_security_group_id]
-    assign_public_ip = false
+    assign_public_ip = true
   }
 
   load_balancer {
@@ -132,15 +64,12 @@ resource "aws_ecs_service" "flash_sale_api" {
     container_port   = 8080
   }
 
-  depends_on = [var.alb_listener_arn]
-
   lifecycle {
     ignore_changes = [desired_count]
   }
 }
 
-# Order Worker
-# No ALB - worker only polls SQS, no inbound HTTP traffic needed
+# ── Order Worker ───────────────────────────────────────────────────────────────
 resource "aws_ecs_task_definition" "order_worker" {
   family                   = "${var.project}-order-worker"
   network_mode             = "awsvpc"
@@ -154,15 +83,13 @@ resource "aws_ecs_task_definition" "order_worker" {
     name      = "order-worker"
     image     = var.order_worker_image
     essential = true
-
     environment = [
-      { name = "SQS_QUEUE_URL",       value = var.sqs_queue_url },
-      { name = "DYNAMODB_TABLE",      value = var.dynamodb_orders_table },
-      { name = "INVENTORY_TABLE",     value = var.dynamodb_inventory_table },
-      { name = "NUM_WORKERS",         value = tostring(var.order_worker_goroutines) },
-      { name = "AWS_REGION",          value = var.aws_region },
+      { name = "SQS_QUEUE_URL",   value = var.sqs_queue_url },
+      { name = "DYNAMODB_TABLE",  value = var.dynamodb_orders_table },
+      { name = "INVENTORY_TABLE", value = var.dynamodb_inventory_table },
+      { name = "NUM_WORKERS",     value = tostring(var.order_worker_goroutines) },
+      { name = "AWS_REGION",      value = var.aws_region },
     ]
-
     logConfiguration = {
       logDriver = "awslogs"
       options = {
@@ -182,9 +109,9 @@ resource "aws_ecs_service" "order_worker" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = var.private_subnet_ids
+    subnets          = var.subnet_ids
     security_groups  = [var.ecs_security_group_id]
-    assign_public_ip = false
+    assign_public_ip = true
   }
 
   lifecycle {
@@ -192,35 +119,58 @@ resource "aws_ecs_service" "order_worker" {
   }
 }
 
-# Auto Scaling
-
-# Waiting Room Auto Scaling - scale on CPU
-resource "aws_appautoscaling_target" "waiting_room" {
-  max_capacity       = 4
-  min_capacity       = 1
-  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.waiting_room.name}"
-  scalable_dimension = "ecs:service:DesiredCount"
-  service_namespace  = "ecs"
-}
-
-resource "aws_appautoscaling_policy" "waiting_room_cpu" {
-  name               = "${var.project}-waiting-room-cpu-scaling"
-  policy_type        = "TargetTrackingScaling"
-  resource_id        = aws_appautoscaling_target.waiting_room.resource_id
-  scalable_dimension = aws_appautoscaling_target.waiting_room.scalable_dimension
-  service_namespace  = aws_appautoscaling_target.waiting_room.service_namespace
-
-  target_tracking_scaling_policy_configuration {
-    predefined_metric_specification {
-      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+# ── Waiting Room ───────────────
+resource "aws_ecs_task_definition" "waiting_room" {
+  family                   = "${var.project}-waiting-room"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = data.aws_iam_role.lab_role.arn
+  task_role_arn            = data.aws_iam_role.lab_role.arn
+  container_definitions = jsonencode([{
+    name      = "waiting-room"
+    image     = var.waiting_room_image
+    essential = true
+    portMappings = [{ containerPort = 8080 }]
+    environment = [
+      { name = "REDIS_ENDPOINT", value = var.redis_endpoint },
+      { name = "REDIS_PORT",     value = "6379" },
+      { name = "ADMISSION_RATE", value = tostring(var.admission_rate) },
+      { name = "AWS_REGION",     value = var.aws_region },
+      { name = "APP_PORT",       value = "8080" },
+    ]
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = var.waiting_room_log_group
+        "awslogs-region"        = var.aws_region
+        "awslogs-stream-prefix" = "ecs"
+      }
     }
-    target_value       = 70.0
-    scale_in_cooldown  = 60
-    scale_out_cooldown = 30
-  }
+  }])
 }
 
-# Flash Sale API Auto Scaling - scale on CPU
+resource "aws_ecs_service" "waiting_room" {
+  name            = "${var.project}-waiting-room"
+  cluster         = aws_ecs_cluster.this.id
+  task_definition = aws_ecs_task_definition.waiting_room.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+  network_configuration {
+    subnets          = var.subnet_ids
+    security_groups  = [var.ecs_security_group_id]
+    assign_public_ip = true
+  }
+  load_balancer {
+    target_group_arn = var.waiting_room_target_group_arn
+    container_name   = "waiting-room"
+    container_port   = 8080
+  }
+  lifecycle { ignore_changes = [desired_count] }
+}
+
+# ── Auto Scaling — Flash Sale API (CPU) ────────────────────────────────────────
 resource "aws_appautoscaling_target" "flash_sale_api" {
   max_capacity       = 4
   min_capacity       = 1
@@ -246,7 +196,7 @@ resource "aws_appautoscaling_policy" "flash_sale_api_cpu" {
   }
 }
 
-# Order Worker Auto Scaling - scale on SQS queue depth
+# ── Auto Scaling — Order Worker (SQS depth) ────────────────────────────────────
 resource "aws_appautoscaling_target" "order_worker" {
   max_capacity       = 4
   min_capacity       = 1
@@ -272,7 +222,6 @@ resource "aws_appautoscaling_policy" "order_worker_sqs" {
         value = var.sqs_queue_name
       }
     }
-    # Scale out when queue depth > 100 messages per worker task
     target_value       = 100.0
     scale_in_cooldown  = 120
     scale_out_cooldown = 30
