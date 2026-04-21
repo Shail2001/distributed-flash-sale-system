@@ -1,0 +1,5 @@
+label,users,inventory,admitted,purchased,sold_out_rejections,wasted_admissions,errors,time_to_sellout_ms,total_wallclock_ms,final_remaining,peak_sqs_depth
+rate1ps,500,100,27,28,0,0,0,-1,30980,72,0
+rate5ps,500,100,151,100,1,54,0,19556,31951,0,0
+rate25ps,500,100,486,100,2,400,0,3548,19764,0,0
+rate100ps,500,100,445,100,12,400,0,939,6281,0,0

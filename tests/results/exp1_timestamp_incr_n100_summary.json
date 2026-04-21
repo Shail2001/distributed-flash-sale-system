@@ -1,0 +1,17 @@
+{
+  "accepted": 100,
+  "collision_rate_pct": 26,
+  "collisions": 26,
+  "gap_rate_pct": 13,
+  "gaps": 13,
+  "latency_max_ms": 53,
+  "latency_p50_ms": 49,
+  "latency_p95_ms": 53,
+  "latency_p99_ms": 53,
+  "max_position": 100,
+  "strategy": "timestamp_incr",
+  "throughput_rps": 1840.4766834610164,
+  "total_wallclock_ms": 54,
+  "unique_positions": 87,
+  "users": 100
+}

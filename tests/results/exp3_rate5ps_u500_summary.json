@@ -1,0 +1,14 @@
+{
+  "admitted": 151,
+  "errors": 0,
+  "final_remaining": 0,
+  "inventory": 100,
+  "label": "rate5ps",
+  "peak_sqs_depth": 0,
+  "purchased": 100,
+  "sold_out_rejections": 1,
+  "time_to_sellout_ms": 19556,
+  "total_wallclock_ms": 31951,
+  "users": 500,
+  "wasted_admissions": 54
+}

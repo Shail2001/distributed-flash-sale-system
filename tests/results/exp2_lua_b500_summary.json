@@ -1,0 +1,16 @@
+{
+  "accepted": 100,
+  "buyers": 500,
+  "errors": 0,
+  "expected_remaining": 0,
+  "final_remaining": 0,
+  "inventory": 100,
+  "latency_p50_ms": 94,
+  "latency_p95_ms": 295,
+  "latency_p99_ms": 311,
+  "oversell": 0,
+  "rejected": 400,
+  "strategy": "lua",
+  "throughput_rps": 1580.7737894654838,
+  "total_wallclock_ms": 316
+}
