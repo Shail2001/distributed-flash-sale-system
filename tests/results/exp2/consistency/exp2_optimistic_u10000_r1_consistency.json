@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-04-21T14:44:25.537266+00:00",
+  "item_id": "flash-sale-item",
+  "inventory_source": "api_inventory",
+  "inventory_count": 5000,
+  "baseline_confirmed": 106524,
+  "baseline_order_count": 106524,
+  "redis_remaining": 1249,
+  "dynamo_confirmed": 3574,
+  "dynamo_confirmed_abs": 110098,
+  "dynamo_order_count": 3574,
+  "dynamo_order_count_abs": 110098,
+  "sum": 4823,
+  "consistent": false,
+  "issues": [
+    "DATA LOSS: sum=4823 is 177 less than INVENTORY_COUNT=5000"
+  ]
+}

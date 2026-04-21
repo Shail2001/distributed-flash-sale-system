@@ -1,0 +1,9 @@
+Method,Name,Error,Occurrences
+GET,GET /inventory,RemoteDisconnected('Remote end closed connection without response'),5
+GET,GET /inventory,HTTPError('502 Server Error: Bad Gateway for url: GET /inventory'),11519
+POST,POST /purchase,CatchResponseError('unexpected status=0 body='),16
+POST,POST /purchase,"CatchResponseError('unexpected status=500 body={""error"":""redis error""}')",3747
+POST,POST /purchase,CatchResponseError('unexpected status=502 body=<html>\r\n<head><title>502 Bad Gateway</title></head>\r\n<body>\r\n<center><h1>502 Bad Gateway</h1></center>\r\n</body>\r\n</html>\r\n'),52141
+GET,GET /inventory,HTTPError('504 Server Error: Gateway Time-out for url: GET /inventory'),28631
+POST,POST /purchase,CatchResponseError('unexpected status=504 body=<html>\r\n<head><title>504 Gateway Time-out</title></head>\r\n<body>\r\n<center><h1>504 Gateway Time-out</h1></center>\r\n</body>\r\n</html>\r\n'),113030
+GET,GET /inventory,HTTPError('500 Server Error: Internal Server Error for url: GET /inventory'),934

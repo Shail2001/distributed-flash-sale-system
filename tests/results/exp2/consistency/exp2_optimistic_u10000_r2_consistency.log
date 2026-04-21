@@ -1,0 +1,16 @@
+------------------------------------------------------------
+  Flash Sale - Post-Experiment Consistency Check 
+------------------------------------------------------------
+  Timestamp:        2026-04-21 15:15:17 UTC
+  Item ID:          flash-sale-item
+  Inventory count:  5000
+
+  Results:
+    Redis remaining inventory:     0
+    DynamoDB confirmed_orders:     5080 (abs=5080, baseline=0)
+    -------------------------------------
+    Sum (should == 5000):          5080
+
+INCONSISTENT — invariant violated :
+ OVERSELL: sum=5080 exceeds INVENTORY_COUNT=5000 by 80
+------------------------------------------------------------

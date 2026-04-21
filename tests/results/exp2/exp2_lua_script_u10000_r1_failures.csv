@@ -1,0 +1,5 @@
+Method,Name,Error,Occurrences
+GET,GET /inventory,HTTPError('503 Server Error: Service Temporarily Unavailable for url: GET /inventory'),388740
+GET,GET /inventory,HTTPError('504 Server Error: Gateway Time-out for url: GET /inventory'),259160
+POST,POST /purchase,CatchResponseError('unexpected status=503 body=<html>...'),1855349
+POST,POST /purchase,CatchResponseError('unexpected status=504 body=<html>...'),795150

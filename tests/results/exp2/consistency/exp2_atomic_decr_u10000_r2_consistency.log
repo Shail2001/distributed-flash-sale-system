@@ -1,0 +1,63 @@
+------------------------------------------------------------
+  Flash Sale - Post-Experiment Consistency Check
+------------------------------------------------------------
+  Timestamp:        2026-04-21 15:34:24 UTC
+  Item ID:          flash-sale-item
+  Inventory count:  5000
+  API base URL:     http://flash-sale-alb-1094041189.us-east-1.elb.amazonaws.com
+  DynamoDB tables:  flash-sale-orders, flash-sale-inventory
+
+  Results:
+    Redis remaining inventory:     0
+    DynamoDB confirmed_orders:     2650 (abs=164463, baseline=161813)
+    -------------------------------------
+    Sum (should == 5000):          2650
+    DynamoDB order record count:   2650 (abs=164462, baseline=161812)
+
+INCONSISTENT — invariant violated:
+ DATA LOSS: sum=2650 is 2350 less than INVENTORY_COUNT=5000
+
+  Full result saved to: consistency_result.json
+------------------------------------------------------------
+------------------------------------------------------------
+  Flash Sale - Post-Experiment Consistency Check
+------------------------------------------------------------
+  Timestamp:        2026-04-21 15:34:47 UTC
+  Item ID:          flash-sale-item
+  Inventory count:  5000
+  API base URL:     http://flash-sale-alb-1094041189.us-east-1.elb.amazonaws.com
+  DynamoDB tables:  flash-sale-orders, flash-sale-inventory
+
+  Results:
+    Redis remaining inventory:     0
+    DynamoDB confirmed_orders:     2650 (abs=164463, baseline=161813)
+    -------------------------------------
+    Sum (should == 5000):          2650
+    DynamoDB order record count:   2650 (abs=164462, baseline=161812)
+
+INCONSISTENT — invariant violated:
+ DATA LOSS: sum=2650 is 2350 less than INVENTORY_COUNT=5000
+
+  Full result saved to: consistency_result.json
+------------------------------------------------------------
+------------------------------------------------------------
+  Flash Sale - Post-Experiment Consistency Check
+------------------------------------------------------------
+  Timestamp:        2026-04-21 15:35:10 UTC
+  Item ID:          flash-sale-item
+  Inventory count:  5000
+  API base URL:     http://flash-sale-alb-1094041189.us-east-1.elb.amazonaws.com
+  DynamoDB tables:  flash-sale-orders, flash-sale-inventory
+
+  Results:
+    Redis remaining inventory:     0
+    DynamoDB confirmed_orders:     2650 (abs=164463, baseline=161813)
+    -------------------------------------
+    Sum (should == 5000):          2650
+    DynamoDB order record count:   2650 (abs=164462, baseline=161812)
+
+INCONSISTENT — invariant violated:
+ DATA LOSS: sum=2650 is 2350 less than INVENTORY_COUNT=5000
+
+  Full result saved to: consistency_result.json
+------------------------------------------------------------

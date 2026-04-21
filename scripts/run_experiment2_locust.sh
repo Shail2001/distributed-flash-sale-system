@@ -72,6 +72,7 @@ echo "  output_prefix=$CSV_PREFIX"
     --spawn-rate "$SPAWN_RATE" \
     --run-time "$DURATION" \
     --csv "$CSV_PREFIX" \
+    --exit-code-on-error 0 \
     --only-summary
 ) | tee "$LOG_FILE"
 

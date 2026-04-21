@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-04-21T13:07:00.256874+00:00",
+  "item_id": "flash-sale-item",
+  "inventory_source": "api_inventory",
+  "inventory_count": 5000,
+  "baseline_confirmed": 29030,
+  "baseline_order_count": 29030,
+  "redis_remaining": 0,
+  "dynamo_confirmed": 5000,
+  "dynamo_confirmed_abs": 34030,
+  "dynamo_order_count": 5000,
+  "dynamo_order_count_abs": 34030,
+  "sum": 5000,
+  "consistent": true,
+  "issues": []
+}
