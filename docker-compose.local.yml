@@ -1,0 +1,27 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: flashsale-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  localstack:
+    image: localstack/localstack:3.8
+    container_name: flashsale-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=sqs,dynamodb
+      - DEBUG=0
+      - AWS_DEFAULT_REGION=us-east-1
+      - PERSISTENCE=0
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health | grep -q '\"sqs\": \"available\"' && curl -sf http://localhost:4566/_localstack/health | grep -q '\"dynamodb\": \"available\"'"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
