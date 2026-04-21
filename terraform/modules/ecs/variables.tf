@@ -31,6 +31,12 @@ variable "admission_rate" {
   description = "Admission rate/sec — Experiment 3 sweep: 2 → 100"
 }
 
+variable "queue_strategy" {
+  type        = string
+  default     = "timestamp"
+  description = "QUEUE_STRATEGY for waiting-room Experiment 1"
+}
+
 # ECS desired task counts — scale up for experiments
 variable "flash_sale_api_desired_count" {
   type        = number

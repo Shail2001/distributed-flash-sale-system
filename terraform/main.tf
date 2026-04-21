@@ -69,6 +69,7 @@ module "ecs" {
   inventory_count         = var.inventory_count
   order_worker_goroutines = var.order_worker_goroutines
   admission_rate          = var.admission_rate
+  queue_strategy          = var.queue_strategy
 
   flash_sale_api_desired_count = var.flash_sale_api_desired_count
   order_worker_desired_count   = var.order_worker_desired_count
