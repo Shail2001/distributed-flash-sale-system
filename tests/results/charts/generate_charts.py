@@ -21,19 +21,32 @@ def read_csv(path):
 # ------------------------------------------------------------------
 # Experiment 1 — waiting-room fairness
 # ------------------------------------------------------------------
-exp1 = read_csv(RESULTS / "exp1_sweep.csv")
-# Filter to the v2 rows so the chart compares apples to apples (same atomic code path,
-# only scoring differs). The pre-fix rows are kept in the CSV for the narrative but
-# excluded from the chart.
-exp1_v2 = [r for r in exp1 if r["strategy"] in ("timestamp_v2", "timestamp_incr_v2")]
-users = sorted({int(r["users"]) for r in exp1_v2})
+aws_exp1_root = RESULTS / "aws-exp1-2026-04-21"
+if aws_exp1_root.exists():
+    exp1_rows = read_csv(aws_exp1_root / "timestamp" / "exp1_sweep.csv") + read_csv(
+        aws_exp1_root / "timestamp_incr" / "exp1_sweep.csv"
+    )
+    strategy_rows = {
+        "timestamp": [r for r in exp1_rows if r["strategy"] == "timestamp"],
+        "timestamp_incr": [r for r in exp1_rows if r["strategy"] == "timestamp_incr"],
+    }
+else:
+    exp1 = read_csv(RESULTS / "exp1_sweep.csv")
+    # Fallback to the local v2 rows so the chart compares apples to apples
+    # (same atomic code path, only scoring differs).
+    strategy_rows = {
+        "timestamp": [r for r in exp1 if r["strategy"] == "timestamp_v2"],
+        "timestamp_incr": [r for r in exp1 if r["strategy"] == "timestamp_incr_v2"],
+    }
+
+users = sorted({int(r["users"]) for rows in strategy_rows.values() for r in rows})
 
 fig, ax = plt.subplots(figsize=(7, 4.2))
 for strat, color, label in [
-    ("timestamp_v2", "#d62728", "timestamp-only (Strategy A)"),
-    ("timestamp_incr_v2", "#2ca02c", "monotonic INCR (Strategy B)"),
+    ("timestamp", "#d62728", "timestamp-only (Strategy A)"),
+    ("timestamp_incr", "#2ca02c", "monotonic INCR (Strategy B)"),
 ]:
-    rows = sorted([r for r in exp1_v2 if r["strategy"] == strat], key=lambda r: int(r["users"]))
+    rows = sorted(strategy_rows[strat], key=lambda r: int(r["users"]))
     xs = [int(r["users"]) for r in rows]
     ys = [float(r["collision_rate_pct"]) for r in rows]
     ax.plot(xs, ys, marker="o", linewidth=2, color=color, label=label)
@@ -50,10 +63,10 @@ plt.close(fig)
 # Latency chart too
 fig, ax = plt.subplots(figsize=(7, 4.2))
 for strat, color, label in [
-    ("timestamp_v2", "#d62728", "timestamp-only"),
-    ("timestamp_incr_v2", "#2ca02c", "monotonic INCR"),
+    ("timestamp", "#d62728", "timestamp-only"),
+    ("timestamp_incr", "#2ca02c", "monotonic INCR"),
 ]:
-    rows = sorted([r for r in exp1_v2 if r["strategy"] == strat], key=lambda r: int(r["users"]))
+    rows = sorted(strategy_rows[strat], key=lambda r: int(r["users"]))
     xs = [int(r["users"]) for r in rows]
     ys = [int(r["latency_p99_ms"]) for r in rows]
     ax.plot(xs, ys, marker="s", linewidth=2, color=color, label=label)

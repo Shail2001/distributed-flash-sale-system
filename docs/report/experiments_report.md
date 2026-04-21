@@ -45,7 +45,9 @@ position each user is assigned and the request latency. Metric: **position
 collision rate** -- the fraction of accepted users whose assigned position is
 shared with at least one other user.
 
-N in {100, 500, 1000} users, each strategy, single local waiting-room replica.
+We used two phases: an initial local bug-discovery sweep at 100/500/1000 users,
+then the final validation sweep on AWS ECS/ALB at **1000 / 5000 / 10000**
+users for both strategies.
 
 **Bugs discovered during implementation.** Running the sweep against the
 as-shipped code produced collision rates of 6%-26% in *both* strategies -- the
@@ -73,28 +75,34 @@ between A and B; the atomic read-back path is identical.
 \includegraphics[width=0.78\textwidth]{../../tests/results/charts/exp1_collision_rate.png}
 \end{center}
 
-| Users | Strategy A (timestamp) | Strategy B (INCR) |
-|------:|-----------------------:|------------------:|
-|   100 | 69% collisions         | **0**             |
-|   500 | 73%                    | **0**             |
-|  1000 | 72%                    | **0**             |
+| Users | Strategy A collision rate | Strategy B collision rate | Notes |
+|------:|--------------------------:|--------------------------:|-------|
+|  1000 | 36.8%                     | **0%**                    | both accepted all 1000 |
+|  5000 | 58.1%                     | **0%**                    | B accepted 4950; 50 harness timeouts |
+| 10000 | 66.5%                     | **0%**                    | B accepted 9612; 388 transport resets/timeouts |
 
-p99 join latency at 1000 users: A = 192 ms, B = 148 ms (B is also faster -- the
-Lua script saves a round-trip).
+AWS p99 join latency at 1000 users: A = 4464 ms, B = 4367 ms. At higher loads
+Strategy B remained collision-free but paid extra latency because more requests
+survived long enough to wait on the real ALB/ECS/Redis path instead of failing
+fast on a duplicate-position race.
 
-**Analysis.** Strategy A's collision rate is not a noisy accident: it
-stabilizes around 70% once concurrency saturates the ms timestamp granularity.
-The failure is deterministic -- whenever two requests land in the same ms
-bucket, the sorted-set insert orders them by member-string lex, which can
-displace any already-observed caller. Strategy B eliminates the failure
-completely because `INCR` guarantees a strictly monotonic, unique score per
-call, and the atomic Lua guarantees the rank returned *is* the rank at insert
-time.
+**Analysis.** The AWS sweep confirms the same correctness story as the local
+debugging phase. Strategy A degrades monotonically as concurrency rises:
+36.8% collisions at 1k, 58.1% at 5k, and 66.5% at 10k. This is the exact
+failure mode we expected from millisecond timestamp buckets under bursty joins.
+Strategy B eliminates collisions completely because `INCR` guarantees a unique,
+strictly monotonic score and the atomic Lua path returns the rank at insert
+time. The small nonzero "gaps" at 5k and 10k under Strategy B were not fairness
+bugs: the per-user CSVs show they came from harness-side timeouts / connection
+resets before a `201 Created` was received.
 
-**Limitations.** All runs used a single local waiting-room replica and a
-local-network Redis with near-zero RTT. Under multi-replica ECS with real
-network RTT, the ms-bucket collisions would be sparser but still present; the
-INCR strategy's correctness guarantee is unchanged.
+**Limitations.** The final reported table is AWS-backed, but still uses a
+single waiting-room service behind one ALB target at a time. At 5k and 10k
+some requests hit client-side timeouts or transport resets before the service
+responded, so accepted requests are slightly below total generated load.
+That affects throughput and acceptance counts, but not the fairness conclusion:
+the accepted `timestamp_incr` joins remained collision-free across the entire
+sweep.
 
 # 3 Experiment 2 -- Inventory correctness
 

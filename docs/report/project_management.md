@@ -57,7 +57,55 @@ burning ECS time.
 | Local-dev harness             | Vikas    | done (docker-compose + bootstrap script) |
 | Video                         | all      | scheduled |
 
-# 3 Timeline vs. plan
+# 3 How we worked as a team
+
+We operated like a small software team with clear ownership, a shared mainline,
+and explicit integration checkpoints rather than three people editing the same
+files ad hoc.
+
+**Ownership model.** The architecture was split along service boundaries. Shail
+owned infrastructure and the waiting-room, Vikas owned the flash-sale-api,
+experiment harnesses, charts, and most of the final report plumbing, and
+Darshan owned the order-worker and the later Exp 2 automation / Locust work.
+This let each person move quickly inside a bounded area while still keeping the
+system design coherent.
+
+**Communication pattern.** We coordinated through the shared GitHub repo,
+commit history, branch handoffs, and direct teammate check-ins before touching
+shared infrastructure or running expensive experiments. In practice this looked
+like lightweight standups: "what changed, what is blocked, what is safe to
+test, and what must stay stable on `main`." That mattered most in the final
+stretch, when one teammate was running Exp 2, another was testing Exp 3, and
+we needed to avoid invalidating each other's AWS state.
+
+**Scrum-like workflow.** The proposal acted as the initial backlog. We then
+worked in short loops:
+
+1. Build one vertical slice (infra, waiting-room, purchase path, worker).
+2. Smoke-test that slice locally or on ECS.
+3. Integrate it with the next service boundary.
+4. Run one experiment or bug-reproduction pass.
+5. Triage findings and only then expand scope.
+
+That is why the repo history shows bursts of service work followed by
+integration / debugging commits rather than one giant "final project" drop.
+
+**GitHub / branch discipline.** We kept `main` as the shared baseline and used
+feature or review branches when changes could destabilize active experiments.
+Late in the project, this became essential: rather than force everyone onto a
+moving `main`, we validated fixes on a review branch first, then fast-forwarded
+the shared branch only after the results, report, and harness files were all in
+place. The repository history itself is therefore part of the project-management
+artifact: it shows ownership, sequencing, stabilization work, and late bug
+triage.
+
+**Environment isolation.** We also treated AWS accounts/environments like
+separate test environments in a company setting. Exp 2 and Exp 3 were run in
+separate places so one person's load test would not invalidate another's
+results. That decision reduced rework and made the final experiment numbers
+credible.
+
+# 4 Timeline vs. plan
 
 | Week | Planned                                   | Actual                                              |
 |------|-------------------------------------------|-----------------------------------------------------|
@@ -72,7 +120,7 @@ was never verified. Both were caught by the Experiment 1 data rather than by
 unit tests, which is itself a finding worth reporting in the lessons
 learned.
 
-# 4 Problems encountered
+# 5 Problems encountered
 
 1. **Float64 precision destroyed Strategy B of Exp 1.** The
    waiting-room's tiebreaker score was `ms + seq/1e9`. At 2026 timestamps,
@@ -99,7 +147,23 @@ learned.
    This saved ~2 days that would otherwise have gone into custom endpoint
    resolvers.
 
-# 5 What we would do differently
+# 6 Final-stage process lessons
+
+- **Freeze feature work earlier and enter explicit stabilization mode.** Once
+  the experiments started producing real data, the project became more like
+  release engineering than feature development. The most productive behavior in
+  the last 24 hours was not "add more" but "keep the branch stable, rerun,
+  verify, document."
+- **Make branch promotion a first-class step.** The safe-review-branch pattern
+  we used at the end should have existed from the start. It gave us a clean
+  place to integrate fixes, results, PDFs, and harnesses before updating
+  `main`.
+- **Treat experiments as production changes.** A load harness or Terraform
+  variable can change the behavior of the system just as much as a Go code
+  patch. We learned to review experiment scripts and infra variables with the
+  same seriousness as service code.
+
+# 7 What we would do differently
 
 - **Add a contract test between services from day one.** If
   flash-sale-api had an integration test that required a valid waiting-room
