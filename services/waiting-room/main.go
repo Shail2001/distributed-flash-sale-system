@@ -30,8 +30,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	// PoolSize + PoolTimeout tuned for 10k-concurrent-joiner bursts. The go-redis
+	// default (PoolSize = 10*NumCPU ≈ 80; PoolTimeout = 4s) saturated under that
+	// load: peak instantaneous connection demand exceeded 500 during the join
+	// storm, and the admission ticker's metric INCR lost connection-wait races
+	// and returned "redis: connection pool timeout". 2000 slots + 10s wait
+	// absorb the burst; steady-state connection count is far lower.
 	rdb := goredis.NewClient(&goredis.Options{
-		Addr: fmt.Sprintf("%s:%s", cfg.RedisEndpoint, cfg.RedisPort),
+		Addr:        fmt.Sprintf("%s:%s", cfg.RedisEndpoint, cfg.RedisPort),
+		PoolSize:    2000,
+		PoolTimeout: 10 * time.Second,
 	})
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

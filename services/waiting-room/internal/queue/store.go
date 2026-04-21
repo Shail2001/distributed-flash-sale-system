@@ -26,6 +26,28 @@ func NewStore(rdb *redis.Client) *Store {
 	return &Store{rdb: rdb}
 }
 
+// joinTimestampScript: ZADD (NX) at the client-supplied ms timestamp, then ZRANK.
+// Strategy A for Exp 1 — ties are possible since multiple clients can land in the
+// same ms bucket. ZADD and ZRANK run atomically on the server, so the caller's
+// rank is a true snapshot of the queue at ADD time (not a later state that may
+// have shifted under concurrent inserts).
+// KEYS[1] = queue key, ARGV[1] = score, ARGV[2] = member id.
+var joinTimestampScript = redis.NewScript(`
+	redis.call('ZADD', KEYS[1], 'NX', ARGV[1], ARGV[2])
+	return redis.call('ZRANK', KEYS[1], ARGV[2])
+`)
+
+// joinIncrScript: INCR sequence, ZADD (NX) at that score, ZRANK — all atomic.
+// Strategy B for Exp 1. Unlike the earlier ms + seq/1e9 attempt, seq is used as
+// the entire score, so it is exact in float64 for realistic queue sizes and the
+// INCR cannot be reordered relative to the ZADD by concurrent callers.
+// KEYS[1] = queue key, KEYS[2] = seq key, ARGV[1] = member id.
+var joinIncrScript = redis.NewScript(`
+	local seq = redis.call('INCR', KEYS[2])
+	redis.call('ZADD', KEYS[1], 'NX', seq, ARGV[1])
+	return redis.call('ZRANK', KEYS[1], ARGV[1])
+`)
+
 // Join adds userID to the queue for itemID using the given strategy.
 // Idempotent: if userID is already present, returns their existing position unchanged.
 // Returns 1-indexed position.
@@ -37,17 +59,25 @@ func (s *Store) Join(ctx context.Context, userID, itemID, strategy string) (int6
 		return rank + 1, nil
 	}
 
-	score := s.scoreFor(ctx, itemID, strategy)
-
-	if err := s.rdb.ZAdd(ctx, queueKey, redis.Z{Score: score, Member: userID}).Err(); err != nil {
-		return 0, fmt.Errorf("zadd: %w", err)
+	var rank int64
+	var err error
+	if strategy == "timestamp_incr" {
+		rank, err = joinIncrScript.Run(
+			ctx, s.rdb,
+			[]string{queueKey, prefixSeq + itemID},
+			userID,
+		).Int64()
+	} else {
+		rank, err = joinTimestampScript.Run(
+			ctx, s.rdb,
+			[]string{queueKey},
+			time.Now().UnixMilli(),
+			userID,
+		).Int64()
 	}
-
-	rank, err := s.rdb.ZRank(ctx, queueKey, userID).Result()
 	if err != nil {
-		return 0, fmt.Errorf("zrank after join: %w", err)
+		return 0, fmt.Errorf("join script: %w", err)
 	}
-
 	return rank + 1, nil
 }
 
@@ -111,29 +141,6 @@ func (s *Store) Ping(ctx context.Context) error {
 	return s.rdb.Ping(ctx).Err()
 }
 
-// scoreFor returns the ZADD score based on the strategy.
-//
-// "timestamp"       — millisecond Unix timestamp.
-//                     Ties are possible when two instances call within the same ms.
-//                     This is Strategy A for Experiment 1: measures out-of-order rate.
-//
-// "timestamp_incr"  — millisecond timestamp + Redis INCR tiebreaker as fractional part.
-//                     The INCR is global and atomic, so no two members share a score.
-//                     This is Strategy B for Experiment 1: eliminates out-of-order assignments.
-func (s *Store) scoreFor(ctx context.Context, itemID, strategy string) float64 {
-	ms := float64(time.Now().UnixMilli())
-	if strategy != "timestamp_incr" {
-		return ms
-	}
-	seq, err := s.rdb.Incr(ctx, prefixSeq+itemID).Result()
-	if err != nil {
-		// Degrade gracefully — fall back to timestamp-only on INCR failure.
-		return ms
-	}
-	// seq/1e9 is sub-millisecond and does not affect ordering relative to other ms buckets,
-	// but breaks ties deterministically within the same millisecond.
-	return ms + float64(seq)/1e9
-}
 
 // QueueSize returns the current number of members in the queue for itemID.
 func (s *Store) QueueSize(ctx context.Context, itemID string) (int64, error) {
