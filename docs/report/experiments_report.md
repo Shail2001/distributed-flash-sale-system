@@ -160,63 +160,56 @@ at the cost of extra round-trips. The conclusion stands: the retry budget
 needed to reach atomic-DECR parity under heavy contention is large enough that
 atomic DECR or Lua is the correct default.
 
-# 4 Experiment 3 -- Admission-rate tuning
+# 4 Experiment 3 -- Admission-rate tuning and worker concurrency
 
-**Purpose.** The waiting room's admission controller releases users at a
-configurable rate. This rate is the key operational knob: too slow and the sale
-takes too long (users abandon); too fast and users are admitted after stock is
-gone ("wasted admissions"). Experiment 3 measures this tradeoff.
+**Purpose.** Measure how admission rate and order-worker goroutine count affect
+time-to-sellout, purchase latency, and SQS drain behavior under realistic
+flash sale load.
 
-**Setup.** 500 users join the waiting room; the admission ticker releases
-tokens at rate R; each admitted user attempts a purchase via `POST /purchase`
-with their `X-Admission-Token`. The flash-sale-api enforces the token (a
-late-stage fix; without enforcement the waiting-room is bypassable and the
-experiment is meaningless). R in {1, 5, 25, 100} admissions/sec, 500 users, 100
-units inventory, 20-goroutine order-worker draining SQS. 30-second cap per run.
+**Setup.** 1,000 concurrent users, 500 inventory units, admission rates R in
+{10, 50, 100}/s per replica (2 waiting-room replicas), worker goroutines in
+{20, 40, 80}. 9 runs on ECS Fargate, 5-minute cap per run.
 
-**Results.**
+**Bug discovered: DynamoDB TransactionConflict.** During the initial sweep we
+discovered that the order worker's `TransactWriteItems` -- which bundled order
+insert and inventory audit counter in one transaction -- caused 19% of orders
+to land in the Dead Letter Queue under concurrent writes. Three iterations
+resolved it: (v1) baseline = 94 DLQ; (v2) jitter on retry = 72; (v3)
+decoupled into `PutItem` + idempotent `UpdateItem` = **0**. All 9 final runs
+completed with zero DLQ failures.
 
 \begin{center}
-\includegraphics[width=0.78\textwidth]{../../tests/results/charts/exp3_admission_tradeoff.png}
+\includegraphics[width=0.78\textwidth]{../../tests/results/charts/exp3_tradeoff_dual.png}
 \end{center}
 
-| Rate (/s) | Time to sell out | Wasted admissions | Purchased |
-|----------:|-----------------:|------------------:|----------:|
-|         1 | (did not sell out in 30s) |          0 |        28 |
-|         5 | 19.6 s           |                54 |       100 |
-|        25 | **3.5 s**        |               400 |       100 |
-|       100 | **0.9 s**        |               400 |       100 |
+| Rate (/s) | Workers | Sell-out | /purchase p50 | /purchase p99 | Polls |
+|----------:|--------:|---------:|--------------:|--------------:|------:|
+|        10 |      20 | **25.7s**|        45 ms  |       420 ms  | 12,019|
+|        50 |      20 |   5.4 s  |       150 ms  |       450 ms  |     0 |
+|       100 |      20 |   6.4 s  |       210 ms  |       820 ms  |     0 |
+|        10 |      40 |   5.3 s  |       130 ms  |       300 ms  |     0 |
+|        50 |      40 |   5.4 s  |       120 ms  |       450 ms  |     0 |
+|       100 |      40 |   5.3 s  |       120 ms  |       270 ms  |     0 |
+|        10 |      80 |   5.3 s  |       120 ms  |       240 ms  |     0 |
+|        50 |      80 |   5.3 s  |       120 ms  |       330 ms  |    59 |
+|       100 |      80 |   5.4 s  |       130 ms  |       330 ms  |     0 |
 
-Peak SQS depth remained at **0** across all runs -- with admission control in
-place, the purchase path never outran the order-worker's drain capacity,
-regardless of rate tested. This is the contrast against the HW7 uncontrolled
-design that produced a 1,196-message backlog with 20 users in 60 seconds.
+Zero oversell, zero DLQ failures, zero purchase errors across all 9 runs.
+SQS queue depth stayed at 0 throughout.
 
-**Analysis.** Time-to-sellout falls off rapidly with admission rate (6x
-speedup from 5/s to 25/s; further 4x from 25/s to 100/s). Wasted admissions
-climb sharply past the rate where users arrive faster than Redis DECRBY can
-rate-limit them -- once admission outpaces the DECR critical section, the
-overflow all becomes waste. The "correct" operating point depends on the
-product: a 60-second sellout with near-zero waste versus a 1-second sellout
-that tells 400 users "too late, stock is gone" is a UX decision, not a
-technical one.
+**Analysis.** At rate=10/s (effective 20/s), admission genuinely throttled
+users: sell-out took 25.7s with 12k position polls, and purchase p50 was
+just 45ms because load was spread over time. At rates 50 and 100, all users
+were admitted within the spawn window, producing ~5.3s sell-out -- but purchase
+contention increased sharply: p50 rose from 45ms to 210ms and p99 from 420ms
+to 820ms at rate=100. This is the core tradeoff: **lower admission rates
+produce slower sell-outs but significantly lower purchase latency.**
 
-The SQS-backlog prediction from HW7 is *refuted* in this configuration. The
-reason: once admission is rate-controlled, the purchase path is rate-limited
-too, and at the rates we tested (<=100/s) the 20-goroutine order-worker
-comfortably keeps up. The queue backlog problem re-emerges only if admission
-rate exceeds worker capacity *or* worker count is reduced -- which is the
-follow-up experiment we would run with more time and real ECS worker-count
-scaling.
-
-**Limitations.** (i) Single-replica flash-sale-api -- we couldn't sweep ECS
-task counts. (ii) 30-second cap on the 1/s run means we don't have a "slow
-admission" sellout time; extrapolating from 28 purchases in 30s gives a
-sellout projection of ~107 s. (iii) SQS sampling ran at 500 ms; finer
-granularity might catch brief spikes, though given the measured zero backlog
-we don't think spikes exist at this scale. (iv) The order-worker goroutine
-sweep (20/40/80) in the original proposal was not executed due to time; the
-admission-rate tradeoff alone is the most operationally useful result.
+Worker goroutine count (20→40→80) had minimal impact on sell-out time, confirming
+that at 500 orders over 5 seconds, even 20 goroutines comfortably drain the SQS
+queue. The effect becomes visible in tail latency: at rate=100, increasing from
+20 to 40 goroutines cut p99 from 820ms to 270ms, indicating that faster SQS
+drain reduces back-pressure on the Redis→SQS publish path.
 
 # 5 Scale stress: 10,000 concurrent users
 
@@ -243,18 +236,18 @@ thundering herd a flash sale creates in the first two seconds.
 
 # 6 Cross-cutting conclusions
 
-1. **Atomic operations are the right default.** Every experiment came down to
-   this: Redis `INCR` (Exp 1), `DECRBY` or Lua (Exp 2), and the atomic
-   admission counter behind the rate limiter (Exp 3). Optimistic patterns
-   were either silently broken (Exp 1's float64 bug) or dramatically less
-   useful (Exp 2's stock wastage).
-2. **Correctness bugs can hide behind successful tests.** Exp 1 exposed a "fix"
-   that had been merged, reviewed, and marked Done but never actually did
-   anything -- the INCR tiebreaker value was lost to float64 precision on every
-   call. We only caught it because the sweep-across-concurrencies data
-   looked *identical* between the two strategies.
-3. **The admission layer is load-bearing, not decorative.** For two weeks the
-   waiting-room issued tokens that no downstream service checked. Wiring the
-   `X-Admission-Token` gate into flash-sale-api was a five-line change that
-   turned the whole waiting-room from a measurement artifact into a real
-   control surface. Exp 3 would have been meaningless without it.
+1. **Atomic operations are the right default.** Redis `INCR` (Exp 1), `DECRBY`
+   or Lua (Exp 2), and the admission counter (Exp 3) -- every experiment
+   confirmed that atomic primitives outperform optimistic patterns, which were
+   either silently broken (float64 precision bug) or dramatically wasteful
+   (83% unsold inventory).
+2. **Transaction boundaries matter more than transaction guarantees.** Exp 3's
+   DLQ bug was textbook-correct atomicity (`TransactWriteItems`) that failed
+   at 19% under contention. Decoupling into two idempotent writes eliminated
+   it. In high-contention paths, reducing per-write blast radius beats
+   wrapping everything in one transaction.
+3. **The admission layer shapes all downstream behavior.** When admission rate
+   exceeded spawn rate, sell-out time and latency were determined by the load
+   generator, not the system. The admission rate is the single most impactful
+   operational knob -- worker goroutine count was a second-order effect at
+   moderate scale.
