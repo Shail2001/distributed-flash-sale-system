@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"log"
 	"net/http"
 
@@ -39,33 +40,33 @@ func (h *Handler) Purchase(c *gin.Context) {
 	ctx := c.Request.Context()
 	const itemID = "flash-sale-item"
 
-	// Step 1: Atomic DECR — this is the entire point of Redis here.
-	// Do NOT read-check-write. Decrement by the requested quantity and inspect the result.
-	remaining, err := redisclient.DecrInventoryBy(ctx, h.rdb, itemID, req.Quantity)
+	// Step 1: Reserve inventory using configured strategy.
+	remaining, err := redisclient.ReserveInventory(ctx, h.rdb, itemID, req.Quantity, h.inventoryMode)
 	if err != nil {
-		log.Printf("Redis DECR error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "redis error"})
-		return
-	}
-
-	// Step 2: If negative → sold out. INCR back to prevent counter going below 0.
-	if remaining < 0 {
-		if incrErr := redisclient.IncrInventoryBy(ctx, h.rdb, itemID, req.Quantity); incrErr != nil {
-			log.Printf("Redis INCR correction error: %v", incrErr)
+		switch {
+		case errors.Is(err, redisclient.ErrSoldOut):
+			c.JSON(http.StatusConflict, soldOutResponse{
+				Error:   "SOLD_OUT",
+				Message: "No inventory remaining",
+			})
+			return
+		case errors.Is(err, redisclient.ErrUnknownStrategy):
+			log.Printf("Invalid inventory strategy configured: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid inventory strategy"})
+			return
+		default:
+			log.Printf("Redis reserve error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "redis error"})
+			return
 		}
-		c.JSON(http.StatusConflict, soldOutResponse{
-			Error:   "SOLD_OUT",
-			Message: "No inventory remaining",
-		})
-		return
 	}
 
-	// Step 3: Inventory available — generate order ID and publish to SQS.
+	// Step 2: Inventory reserved — generate order ID and publish to SQS.
 	orderID := uuid.New().String()
 
 	if err := h.publisher.PublishOrder(ctx, orderID, req.CustomerID, itemID, req.Quantity); err != nil {
-		// SQS publish failed — roll back the DECR so inventory stays consistent.
-		log.Printf("SQS publish error for order %s: %v — rolling back DECR", orderID, err)
+		// SQS publish failed — roll back reservation so inventory stays consistent.
+		log.Printf("SQS publish error for order %s: %v — rolling back reservation", orderID, err)
 		if incrErr := redisclient.IncrInventoryBy(ctx, h.rdb, itemID, req.Quantity); incrErr != nil {
 			log.Printf("Redis rollback INCR error: %v", incrErr)
 		}

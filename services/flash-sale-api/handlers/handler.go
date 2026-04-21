@@ -16,13 +16,15 @@ type Handler struct {
 	rdb            *redis.Client
 	publisher      OrderPublisher
 	inventoryCount int
+	inventoryMode  string
 }
 
 // NewHandler constructs a Handler with injected dependencies.
-func NewHandler(rdb *redis.Client, publisher OrderPublisher, inventoryCount int) *Handler {
+func NewHandler(rdb *redis.Client, publisher OrderPublisher, inventoryCount int, inventoryMode string) *Handler {
 	return &Handler{
 		rdb:            rdb,
 		publisher:      publisher,
 		inventoryCount: inventoryCount,
+		inventoryMode:  inventoryMode,
 	}
 }

@@ -22,6 +22,7 @@ func main() {
 	redisPort := getEnv("REDIS_PORT", "6379")
 	sqsQueueURL := getEnv("SQS_QUEUE_URL", "")
 	inventoryCount := getEnvInt("INVENTORY_COUNT", 100)
+	inventoryStrategy := getEnv("INVENTORY_STRATEGY", redisclient.StrategyAtomicDecr)
 	awsRegion := getEnv("AWS_REGION", "us-east-1")
 	appPort := getEnv("APP_PORT", "8080")
 
@@ -45,7 +46,7 @@ func main() {
 	publisher := sqsclient.NewPublisher(sqsSvc, sqsQueueURL)
 
 	// Build handler dependencies
-	h := handlers.NewHandler(rdb, publisher, inventoryCount)
+	h := handlers.NewHandler(rdb, publisher, inventoryCount, inventoryStrategy)
 
 	// Router
 	r := gin.Default()

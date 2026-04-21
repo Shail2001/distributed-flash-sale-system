@@ -24,6 +24,7 @@ export REDIS_ENDPOINT=localhost
 export REDIS_PORT=6379
 export SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/<account>/<queue-name>
 export INVENTORY_COUNT=100
+export INVENTORY_STRATEGY=atomic_decr   # atomic_decr | optimistic | lua_script
 export AWS_REGION=us-east-1
 export APP_PORT=8080
 ```
@@ -87,3 +88,13 @@ docker run -p 8080:8080 --env-file .env flash-sale-api
 Redis `DECR` is atomic at the server level — no race conditions across multiple ECS instances.
 The pattern is: **DECR → check result → if < 0, INCR back and return 409**.
 This prevents oversell without locks, transactions, or read-check-write patterns.
+
+## Inventory Strategy Toggle (Experiment 2)
+
+`INVENTORY_STRATEGY` selects the reservation algorithm used by `POST /purchase`:
+
+- `atomic_decr` (default): `DECRBY` then compensate with `INCRBY` if negative.
+- `optimistic`: Redis `WATCH` + `MULTI/EXEC` retries under contention.
+- `lua_script`: Redis Lua `EVAL` performs check-and-decrement server-side.
+
+The handler always rolls inventory back if SQS publish fails, independent of strategy.
