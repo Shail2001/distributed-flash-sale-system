@@ -43,7 +43,7 @@ func TestPurchaseDecrementsInventoryByQuantity(t *testing.T) {
 	}
 
 	publisher := &mockPublisher{}
-	handler := handlers.NewHandler(rdb, publisher, 10, redisclient.StrategyAtomicDecr)
+	handler := handlers.NewHandler(rdb, publisher, 10, redisclient.StrategyAtomicDecr, false)
 	router := gin.New()
 	router.POST("/purchase", handler.Purchase)
 
@@ -94,7 +94,7 @@ func TestPurchaseRollsBackEntireQuantityWhenPublishFails(t *testing.T) {
 	}
 
 	publisher := &mockPublisher{err: context.DeadlineExceeded}
-	handler := handlers.NewHandler(rdb, publisher, 10, redisclient.StrategyAtomicDecr)
+	handler := handlers.NewHandler(rdb, publisher, 10, redisclient.StrategyAtomicDecr, false)
 	router := gin.New()
 	router.POST("/purchase", handler.Purchase)
 
@@ -129,7 +129,7 @@ func TestPurchaseRejectsWhenQuantityExceedsInventory(t *testing.T) {
 	}
 
 	publisher := &mockPublisher{}
-	handler := handlers.NewHandler(rdb, publisher, 2, redisclient.StrategyAtomicDecr)
+	handler := handlers.NewHandler(rdb, publisher, 2, redisclient.StrategyAtomicDecr, false)
 	router := gin.New()
 	router.POST("/purchase", handler.Purchase)
 
@@ -167,7 +167,7 @@ func TestPurchaseWithOptimisticStrategy(t *testing.T) {
 	}
 
 	publisher := &mockPublisher{}
-	handler := handlers.NewHandler(rdb, publisher, 5, redisclient.StrategyOptimistic)
+	handler := handlers.NewHandler(rdb, publisher, 5, redisclient.StrategyOptimistic, false)
 	router := gin.New()
 	router.POST("/purchase", handler.Purchase)
 
@@ -201,7 +201,7 @@ func TestPurchaseWithLuaStrategy(t *testing.T) {
 	}
 
 	publisher := &mockPublisher{}
-	handler := handlers.NewHandler(rdb, publisher, 5, redisclient.StrategyLuaScript)
+	handler := handlers.NewHandler(rdb, publisher, 5, redisclient.StrategyLuaScript, false)
 	router := gin.New()
 	router.POST("/purchase", handler.Purchase)
 
@@ -225,5 +225,69 @@ func TestPurchaseWithLuaStrategy(t *testing.T) {
 	}
 	if remaining != 3 {
 		t.Fatalf("expected remaining inventory 3, got %d", remaining)
+	}
+}
+
+func TestPurchaseRequiresAdmissionTokenWhenEnabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mr := miniredis.RunT(t)
+	rdb := redisclient.NewClient(mr.Host(), mr.Port())
+	t.Cleanup(func() { _ = rdb.Close() })
+
+	if err := redisclient.SetInventory(context.Background(), rdb, "flash-sale-item", 5); err != nil {
+		t.Fatalf("seed inventory: %v", err)
+	}
+
+	publisher := &mockPublisher{}
+	handler := handlers.NewHandler(rdb, publisher, 5, redisclient.StrategyAtomicDecr, true)
+	router := gin.New()
+	router.POST("/purchase", handler.Purchase)
+
+	req := httptest.NewRequest(http.MethodPost, "/purchase", bytes.NewReader([]byte(`{"customer_id":"user-4","quantity":1}`)))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if publisher.called {
+		t.Fatal("publisher should not be called without an admission token")
+	}
+}
+
+func TestPurchaseAcceptsValidAdmissionTokenWhenEnabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mr := miniredis.RunT(t)
+	rdb := redisclient.NewClient(mr.Host(), mr.Port())
+	t.Cleanup(func() { _ = rdb.Close() })
+
+	if err := redisclient.SetInventory(context.Background(), rdb, "flash-sale-item", 5); err != nil {
+		t.Fatalf("seed inventory: %v", err)
+	}
+	if err := rdb.Set(context.Background(), "token:user-5", "token-abc", 0).Err(); err != nil {
+		t.Fatalf("seed token: %v", err)
+	}
+
+	publisher := &mockPublisher{}
+	handler := handlers.NewHandler(rdb, publisher, 5, redisclient.StrategyAtomicDecr, true)
+	router := gin.New()
+	router.POST("/purchase", handler.Purchase)
+
+	req := httptest.NewRequest(http.MethodPost, "/purchase", bytes.NewReader([]byte(`{"customer_id":"user-5","quantity":1}`)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Admission-Token", "token-abc")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !publisher.called {
+		t.Fatal("publisher should be called when a valid admission token is provided")
 	}
 }

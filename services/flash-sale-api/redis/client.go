@@ -4,15 +4,41 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
 // NewClient creates and returns a configured Redis client.
+// PoolSize + PoolTimeout are tuned to absorb 10k-concurrent-buyer bursts;
+// the go-redis default (PoolSize = 10*NumCPU ≈ 80; PoolTimeout = 4s) saturates
+// at that load and returns "connection pool timeout" even though Redis itself
+// is idle.
 func NewClient(endpoint, port string) *redis.Client {
 	return redis.NewClient(&redis.Options{
-		Addr: fmt.Sprintf("%s:%s", endpoint, port),
+		Addr:        fmt.Sprintf("%s:%s", endpoint, port),
+		PoolSize:    2000,
+		PoolTimeout: 10 * time.Second,
 	})
+}
+
+// optimisticRetryLimit controls the max number of WATCH retries in the
+// optimistic-locking inventory path. It defaults to 1 so the repo's
+// Experiment 2 reproduces the contention-loss result described in the report.
+// Raise OPTIMISTIC_RETRY_LIMIT explicitly if you want a more production-like
+// optimistic-locking run with retries.
+func optimisticRetryLimit() int {
+	v := os.Getenv("OPTIMISTIC_RETRY_LIMIT")
+	if v == "" {
+		return 1
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 {
+		return 1
+	}
+	return n
 }
 
 const (
@@ -23,6 +49,7 @@ const (
 
 var (
 	ErrSoldOut         = errors.New("sold out")
+	ErrContention      = errors.New("inventory contention")
 	ErrUnknownStrategy = errors.New("unknown inventory strategy")
 )
 
@@ -75,7 +102,7 @@ func ReserveInventory(ctx context.Context, rdb *redis.Client, itemID string, qua
 
 func reserveWithOptimisticLock(ctx context.Context, rdb *redis.Client, itemID string, quantity int) (int64, error) {
 	key := fmt.Sprintf("inventory:%s", itemID)
-	for attempts := 0; attempts < 10; attempts++ {
+	for attempts := 0; attempts < optimisticRetryLimit(); attempts++ {
 		var remaining int64
 		err := rdb.Watch(ctx, func(tx *redis.Tx) error {
 			current, err := tx.Get(ctx, key).Int64()
@@ -107,7 +134,7 @@ func reserveWithOptimisticLock(ctx context.Context, rdb *redis.Client, itemID st
 		}
 		return 0, err
 	}
-	return 0, redis.TxFailedErr
+	return 0, ErrContention
 }
 
 func reserveWithLua(ctx context.Context, rdb *redis.Client, itemID string, quantity int) (int64, error) {

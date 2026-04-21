@@ -23,6 +23,7 @@ func main() {
 	sqsQueueURL := getEnv("SQS_QUEUE_URL", "")
 	inventoryCount := getEnvInt("INVENTORY_COUNT", 100)
 	inventoryStrategy := getEnv("INVENTORY_STRATEGY", redisclient.StrategyAtomicDecr)
+	requireAdmission := getEnv("REQUIRE_ADMISSION_TOKEN", "false") == "true"
 	awsRegion := getEnv("AWS_REGION", "us-east-1")
 	appPort := getEnv("APP_PORT", "8080")
 
@@ -46,7 +47,7 @@ func main() {
 	publisher := sqsclient.NewPublisher(sqsSvc, sqsQueueURL)
 
 	// Build handler dependencies
-	h := handlers.NewHandler(rdb, publisher, inventoryCount, inventoryStrategy)
+	h := handlers.NewHandler(rdb, publisher, inventoryCount, inventoryStrategy, requireAdmission)
 
 	// Router
 	r := gin.Default()
@@ -55,7 +56,7 @@ func main() {
 	r.POST("/purchase", h.Purchase)
 	r.POST("/reset", h.Reset)
 
-	log.Printf("Flash Sale API starting on port %s", appPort)
+	log.Printf("Flash Sale API starting on port %s (strategy=%s admission_required=%v)", appPort, inventoryStrategy, requireAdmission)
 	if err := r.Run(fmt.Sprintf(":%s", appPort)); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}

@@ -40,6 +40,19 @@ func (h *Handler) Purchase(c *gin.Context) {
 	ctx := c.Request.Context()
 	const itemID = "flash-sale-item"
 
+	if h.requireAdmission {
+		presented := c.GetHeader("X-Admission-Token")
+		if presented == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "admission token required"})
+			return
+		}
+		stored, err := h.rdb.Get(ctx, "token:"+req.CustomerID).Result()
+		if err != nil || stored != presented {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid admission token"})
+			return
+		}
+	}
+
 	// Step 1: Reserve inventory using configured strategy.
 	remaining, err := redisclient.ReserveInventory(ctx, h.rdb, itemID, req.Quantity, h.inventoryMode)
 	if err != nil {
@@ -48,6 +61,12 @@ func (h *Handler) Purchase(c *gin.Context) {
 			c.JSON(http.StatusConflict, soldOutResponse{
 				Error:   "SOLD_OUT",
 				Message: "No inventory remaining",
+			})
+			return
+		case errors.Is(err, redisclient.ErrContention):
+			c.JSON(http.StatusConflict, gin.H{
+				"error":   "CONTENTION",
+				"message": "Inventory contention; retry the purchase",
 			})
 			return
 		case errors.Is(err, redisclient.ErrUnknownStrategy):

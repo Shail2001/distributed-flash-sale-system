@@ -13,18 +13,20 @@ type OrderPublisher interface {
 
 // Handler holds shared dependencies for all HTTP handlers.
 type Handler struct {
-	rdb            *redis.Client
-	publisher      OrderPublisher
-	inventoryCount int
-	inventoryMode  string
+	rdb              *redis.Client
+	publisher        OrderPublisher
+	inventoryCount   int
+	inventoryMode    string
+	requireAdmission bool
 }
 
 // NewHandler constructs a Handler with injected dependencies.
-func NewHandler(rdb *redis.Client, publisher OrderPublisher, inventoryCount int, inventoryMode string) *Handler {
+func NewHandler(rdb *redis.Client, publisher OrderPublisher, inventoryCount int, inventoryMode string, requireAdmission bool) *Handler {
 	return &Handler{
-		rdb:            rdb,
-		publisher:      publisher,
-		inventoryCount: inventoryCount,
-		inventoryMode:  inventoryMode,
+		rdb:              rdb,
+		publisher:        publisher,
+		inventoryCount:   inventoryCount,
+		inventoryMode:    inventoryMode,
+		requireAdmission: requireAdmission,
 	}
 }
