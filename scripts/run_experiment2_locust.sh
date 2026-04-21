@@ -19,6 +19,7 @@ INVENTORY_STRATEGY="${INVENTORY_STRATEGY:-atomic_decr}"
 API_DESIRED_COUNT="${API_DESIRED_COUNT:-}"
 ECS_CLUSTER="${ECS_CLUSTER:-}"
 ECS_SERVICE="${ECS_SERVICE:-}"
+RUN_TAG="${RUN_TAG:-}"
 
 if [[ -z "$HOST" ]]; then
   if command -v terraform >/dev/null 2>&1; then
@@ -46,7 +47,11 @@ fi
 
 mkdir -p "$RESULTS_DIR"
 STAMP="$(date +%Y%m%d_%H%M%S)"
-RUN_ID="${INVENTORY_STRATEGY}_tasks-${API_DESIRED_COUNT:-unchanged}_${STAMP}"
+if [[ -n "$RUN_TAG" ]]; then
+  RUN_ID="$RUN_TAG"
+else
+  RUN_ID="${INVENTORY_STRATEGY}_u${USERS}_tasks-${API_DESIRED_COUNT:-unchanged}_${STAMP}"
+fi
 CSV_PREFIX="$RESULTS_DIR/${RUN_ID}"
 LOG_FILE="$RESULTS_DIR/${RUN_ID}.log"
 

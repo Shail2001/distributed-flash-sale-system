@@ -40,6 +40,12 @@ variable "admission_rate" {
   description = "Users admitted per second from waiting room (Experiment 3 sweep variable)"
 }
 
+variable "queue_strategy" {
+  type        = string
+  default     = "timestamp"
+  description = "Waiting-room queue strategy for Experiment 1: timestamp or timestamp_incr"
+}
+
 variable "order_worker_goroutines" {
   type        = number
   default     = 20

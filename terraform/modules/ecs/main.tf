@@ -138,7 +138,7 @@ resource "aws_ecs_task_definition" "waiting_room" {
       { name = "REDIS_ENDPOINT",  value = var.redis_endpoint },
       { name = "REDIS_PORT",      value = "6379" },
       { name = "ADMISSION_RATE",  value = tostring(var.admission_rate) },
-      { name = "QUEUE_STRATEGY",  value = "timestamp_incr" },
+      { name = "QUEUE_STRATEGY",  value = var.queue_strategy },
       { name = "ITEM_ID",         value = "flash-sale-item" },
       { name = "AWS_REGION",      value = var.aws_region },
       { name = "APP_PORT",        value = "8080" },

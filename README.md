@@ -125,6 +125,20 @@ export INVENTORY_STRATEGY=atomic_decr
 
 Outputs are written under `tests/results/exp2/`.
 
+For the full Experiment 2 matrix (`3 strategies x 3 user levels x 3 replica counts`)
+with post-run consistency checks:
+
+```bash
+export HOST=http://<alb-dns-or-localhost:8080>
+export STRATEGIES="atomic_decr optimistic lua_script"
+export USERS_LEVELS="200 500 1000"
+export REPLICA_COUNTS="1 2 4"
+export SCALE_API=true
+export RUN_CONSISTENCY_CHECK=true
+
+./scripts/run_exp2_matrix.sh
+```
+
 ---
 
 ## AWS deploy
