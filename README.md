@@ -72,6 +72,7 @@ docker run -d -p 6379:6379 redis:7-alpine
 # Run Flash Sale API
 cd services/flash-sale-api
 export REDIS_ENDPOINT=localhost REDIS_PORT=6379 INVENTORY_COUNT=100
+export INVENTORY_STRATEGY=atomic_decr   # atomic_decr | optimistic | lua_script
 export SQS_QUEUE_URL=<your-queue-url> AWS_REGION=us-east-1 APP_PORT=8080
 go run .
 
@@ -131,6 +132,26 @@ Useful overrides:
 
 The smoke test itself lives in `tests/order-flow/` and will skip if the required live AWS environment variables are not set.
 
+## Experiment 2 Load Harness (Locust)
+
+Run a headless Locust sweep for inventory strategy experiments:
+
+```bash
+export HOST=http://<alb-dns-or-localhost:8080>
+export USERS=400
+export SPAWN_RATE=80
+export DURATION=90s
+export PURCHASE_QUANTITY=1
+export INVENTORY_STRATEGY=atomic_decr
+
+# Optional: scale flash-sale-api task count before run
+export API_DESIRED_COUNT=3
+
+./scripts/run_experiment2_locust.sh
+```
+
+Outputs are written under `tests/results/exp2/`.
+
 ---
 
 ## Repo Structure
@@ -144,8 +165,9 @@ The smoke test itself lives in `tests/order-flow/` and will skip if the required
 │   └── waiting-room/   Traffic shaping service
 ├── tests/              Test suites and results
 │   ├── flash-sale-api/ Smoke, concurrency, benchmark tests
+│   ├── locust/         Locust workload for Experiment 2
 │   ├── order-flow/     AWS-backed end-to-end smoke test
 │   ├── order-worker/   Unit tests for worker config and order parsing
 │   └── results/        Experiment results (populated during AWS runs)
-└── scripts/            Utility scripts (smoke test, deploy helpers)
+└── scripts/            Utility scripts (smoke test, deploy, locust runner)
 ```
