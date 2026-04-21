@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-04-21T12:30:40.201350+00:00",
+  "admission_rate": "10",
+  "num_workers": "80",
+  "user_count": "1000",
+  "inventory_count": 500,
+  "joins": 1000,
+  "admitted": 1000,
+  "purchases_ok": 500,
+  "wasted_admissions": 500,
+  "wasted_pct": 50.0,
+  "never_admitted": 0,
+  "purchase_errors": 0,
+  "total_polls": 0,
+  "sold_out": true,
+  "time_to_sell_out": 5.34
+}

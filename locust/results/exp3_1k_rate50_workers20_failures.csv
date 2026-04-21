@@ -1,0 +1,2 @@
+Method,Name,Error,Occurrences
+POST,/purchase,CatchResponseError('SOLD_OUT'),500
