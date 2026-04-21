@@ -165,7 +165,7 @@ Smoke the deployed stack end-to-end (resolves Terraform outputs automatically):
 ## Repo layout
 
 ```text
-├── docs/report/        Experiments report + project management + lessons learned
+├── docs/report/        Final experiments report (Markdown + PDF)
 ├── terraform/          AWS infrastructure (8 modules)
 ├── services/
 │   ├── waiting-room/   Redis ZSET queue + admission ticker
