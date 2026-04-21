@@ -26,10 +26,12 @@ never outruns the persistence layer. We built a three-service system on AWS
 ECS Fargate -- `waiting-room`, `flash-sale-api`, `order-worker` -- with Redis,
 SQS, and DynamoDB, and measured each of these problems in isolation.
 
-Each experiment was run against a local parity stack (Docker Redis + LocalStack
-SQS/DynamoDB) driven by Go harnesses that mirror the load patterns we would
-generate against ECS. Local execution let us iterate on service code and
-isolate bugs that ECS would have masked as noise.
+We used a hybrid evaluation setup. A local parity stack (Docker Redis +
+LocalStack SQS/DynamoDB) let us debug race conditions, smoke-test service
+contracts, and iterate on Go harnesses quickly. Final validation then ran on
+AWS ECS/ALB with real Redis, SQS, and DynamoDB: Exp 1 and Exp 3 used the Go
+harnesses, while Darshan's final Exp 2 sweep used a Locust driver plus post-run
+consistency checks against DynamoDB and Redis state.
 
 # 2 Experiment 1 -- Queue admission fairness
 
@@ -117,11 +119,9 @@ DynamoDB) with fixed inventory of 5,000 units, user levels
 captured Locust aggregate metrics (`Request Count`, `Failure Count`,
 `Average Response Time`) and a post-run consistency invariant:
 
-\[
-\text{remaining inventory} + \Delta \text{confirmed\_orders} = 5000
-\]
+`remaining inventory + delta(confirmed_orders) = 5000`
 
-where \(\Delta \text{confirmed\_orders}\) uses per-run DynamoDB baselines.
+where `delta(confirmed_orders)` uses per-run DynamoDB baselines.
 
 **Results (selected measured runs from `tests/results/exp2`).**
 
@@ -196,11 +196,11 @@ contention increased sharply: p50 rose from 45ms to 210ms and p99 from 420ms
 to 820ms at rate=100. This is the core tradeoff: **lower admission rates
 produce slower sell-outs but significantly lower purchase latency.**
 
-Worker goroutine count (20→40→80) had minimal impact on sell-out time, confirming
+Worker goroutine count (20->40->80) had minimal impact on sell-out time, confirming
 that at 500 orders over 5 seconds, even 20 goroutines comfortably drain the SQS
 queue. The effect becomes visible in tail latency: at rate=100, increasing from
 20 to 40 goroutines cut p99 from 820ms to 270ms, indicating that faster SQS
-drain reduces back-pressure on the Redis→SQS publish path.
+drain reduces back-pressure on the Redis-to-SQS publish path.
 
 # 5 Scale stress: 10,000 concurrent users
 
@@ -227,11 +227,12 @@ thundering herd a flash sale creates in the first two seconds.
 
 # 6 Cross-cutting conclusions
 
-1. **Atomic operations are the right default.** Redis `INCR` (Exp 1), `DECRBY`
-   or Lua (Exp 2), and the admission counter (Exp 3) -- every experiment
-   confirmed that atomic primitives outperform optimistic patterns, which were
-   either silently broken (float64 precision bug) or dramatically wasteful
-   (83% unsold inventory).
+1. **Atomic operations are the safest default, but capacity still matters.**
+   Exp 1 only became correct after moving to an atomic Redis `INCR + ZADD +
+   ZRANK` Lua path, and in Exp 2 the `atomic_decr` strategy had the cleanest
+   low-error profile across the stable 1k/5k runs. At 10k load, however,
+   infrastructure saturation distorted even theoretically safe strategies, so
+   algorithm choice and service capacity have to be evaluated together.
 2. **Transaction boundaries matter more than transaction guarantees.** Exp 3's
    DLQ bug was textbook-correct atomicity (`TransactWriteItems`) that failed
    at 19% under contention. Decoupling into two idempotent writes eliminated
