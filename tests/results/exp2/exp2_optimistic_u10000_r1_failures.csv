@@ -1,0 +1,15 @@
+Method,Name,Error,Occurrences
+GET,GET /inventory,RemoteDisconnected('Remote end closed connection without response'),1
+GET,GET /inventory,HTTPError('502 Server Error: Bad Gateway for url: GET /inventory'),12290
+POST,POST /purchase,CatchResponseError('unexpected status=0 body='),27866
+GET,GET /inventory,"ReadTimeout(ReadTimeoutError(""HTTPConnectionPool(host='flash-sale-alb-1094041189.us-east-1.elb.amazonaws.com', port=80): Read timed out. (read timeout=None)""))",1
+GET,GET /inventory,"ConnectionResetError(54, 'Connection reset by peer')",1
+POST,POST /purchase,"CatchResponseError('unexpected status=500 body={""error"":""redis error""}')",6268
+POST,POST /purchase,CatchResponseError('unexpected status=502 body=<html>\r\n<head><title>502 Bad Gateway</title></head>\r\n<body>\r\n<center><h1>502 Bad Gateway</h1></center>\r\n</body>\r\n</html>\r\n'),49943
+GET,GET /inventory,HTTPError('504 Server Error: Gateway Time-out for url: GET /inventory'),6140
+POST,POST /purchase,CatchResponseError('unexpected status=504 body=<html>\r\n<head><title>504 Gateway Time-out</title></head>\r\n<body>\r\n<center><h1>504 Gateway Time-out</h1></center>\r\n</body>\r\n</html>\r\n'),25001
+GET,GET /inventory,HTTPError('503 Server Error: Service Temporarily Unavailable for url: GET /inventory'),90401
+POST,POST /purchase,CatchResponseError('unexpected status=503 body=<html>\r\n<head><title>503 Service Temporarily Unavailable</title></head>\r\n<body>\r\n<center><h1>503 Service Temporarily Unavailable</h1></center>\r\n</body>\r\n</html>\r\n'),359711
+GET,GET /inventory,"OSError(49, ""Can't assign requested address"")",6907
+GET,GET /inventory,"gaierror(8, 'nodename nor servname provided, or not known')",1
+GET,GET /inventory,HTTPError('500 Server Error: Internal Server Error for url: GET /inventory'),1569

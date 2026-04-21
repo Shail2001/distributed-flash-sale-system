@@ -50,7 +50,7 @@ burning ECS time.
 | flash-sale-api service        | Vikas    | done; quantity fix + Exp 2 strategies + admission gate |
 | order-worker service          | Darshan  | done |
 | Experiment 1 harness + sweep  | Vikas    | done (Go harness; replaced the planned Locust version) |
-| Experiment 2 harness + sweep  | Vikas    | done (3-strategy comparison) |
+| Experiment 2 harness + sweep  | Darshan + Vikas | done (3-strategy AWS matrix, consistency automation, and analysis) |
 | Experiment 3 harness + sweep  | Vikas    | done (local parity stack; no ECS worker-count sweep) |
 | Chart generation              | Vikas    | done (matplotlib) |
 | Final report (5 pages)        | all      | done |

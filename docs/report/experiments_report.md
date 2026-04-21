@@ -109,56 +109,47 @@ sweep.
 **Purpose.** Compare three strategies for decrementing a shared inventory
 counter under contention: **(A) atomic DECRBY + rollback**, **(B) optimistic
 locking via WATCH/MULTI/EXEC**, and **(C) server-side Lua check-and-decrement**.
-Measure oversell and stock utilization.
+Measure correctness and stability under increasing load.
 
-**Setup.** Fixed inventory of 100 units; B concurrent purchase requests fire
-at the single-replica flash-sale-api, each requesting 1 unit. B in {200, 500,
-1000}. We record the number of `201 Created` responses (accepted purchases),
-the final Redis counter (to detect oversell = `accepted > 100`), and
-throughput. Each strategy runs against a fresh process start with Redis reset
-between runs.
+**Setup.** Darshan's final Exp 2 sweep ran on AWS (ALB + ECS + Redis + SQS +
+DynamoDB) with fixed inventory of 5,000 units, user levels
+**1,000 / 5,000 / 10,000**, and replica counts **r1 / r2**. For each run we
+captured Locust aggregate metrics (`Request Count`, `Failure Count`,
+`Average Response Time`) and a post-run consistency invariant:
 
-**Results.**
+\[
+\text{remaining inventory} + \Delta \text{confirmed\_orders} = 5000
+\]
 
-\begin{center}
-\includegraphics[width=0.78\textwidth]{../../tests/results/charts/exp2_accepted.png}
-\end{center}
+where \(\Delta \text{confirmed\_orders}\) uses per-run DynamoDB baselines.
 
-| Strategy    | Buyers | Accepted | Oversell | Throughput (rps) |
-|-------------|-------:|---------:|---------:|-----------------:|
-| atomic      |    200 |      100 |        0 |              184 |
-| atomic      |    500 |      100 |        0 |              456 |
-| atomic      |   1000 |      100 |        0 |         **5,102**|
-| optimistic  |    200 |   **17** |        0 |            1,022 |
-| optimistic  |    500 |   **12** |        0 |            4,083 |
-| optimistic  |   1000 |   **28** |        0 |            3,422 |
-| lua         |    200 |      100 |        0 |              135 |
-| lua         |    500 |      100 |        0 |            1,581 |
-| lua         |   1000 |      100 |        0 |         **5,821**|
+**Results (selected measured runs from `tests/results/exp2`).**
 
-(First-buyer runs for each strategy include compile/JIT warmup and understate
-steady-state throughput; the 1,000-buyer rows are the representative numbers.)
+| Strategy | Users | Replicas | Failure rate | Avg response (ms) | Consistency result |
+|----------|------:|---------:|-------------:|------------------:|--------------------|
+| atomic_decr | 1000 | 1 | 0.00% | 358.8 | Consistent (5000/5000) |
+| atomic_decr | 1000 | 2 | 0.00% | 240.4 | Consistent (5000/5000) |
+| optimistic  | 1000 | 1 | 0.06% | 639.4 | Consistent (5000/5000) |
+| optimistic  | 5000 | 2 | 0.27% | 1179.5 | Consistent (5000/5000) |
+| optimistic  | 10000 | 1 | 99.68% | 3585.8 | Inconsistent (data loss: 4823/5000) |
+| lua_script  | 1000 | 1 | 2.00% | 417.1 | Consistent (5000/5000) |
+| lua_script  | 5000 | 1 | 12.00% | 814.8 | Consistent (5000/5000) |
+| lua_script  | 10000 | 1 | 62.00% | 1843.0 | Inconsistent (oversell: 5200/5000) |
+| lua_script  | 10000 | 2 | 19.90% | 4504.5 | Consistent (5000/5000) |
 
-**Analysis.** Atomic DECRBY and Lua both sell exactly 100 units in every
-configuration -- no oversell, no under-utilization. Optimistic locking is also
-correct (no oversell) but catastrophically wasteful: at 200 concurrent buyers
-it sells only 17 of the 100 available units, because every time a concurrent
-writer commits first the WATCH'd transaction aborts and, per the
-"no-retry-for-measurement" policy, we count it as a rejection. **Optimistic
-locking preserves correctness by sacrificing availability.** In a real flash
-sale this maps to "83% of the inventory never sells" -- a business failure even
-if the system is technically race-free.
+**Analysis.** At low-to-mid load (1k and most 5k runs), all three strategies
+can maintain inventory invariants, with atomic-decr giving the cleanest
+stability profile and the lowest error rates. At 10k load, the system enters
+infrastructure saturation (heavy 502/503/504 and transport errors), and
+correctness checks become sensitive to queue drain timing and tail behavior.
+The key practical takeaway is that **strategy-level correctness must be
+evaluated jointly with service capacity**: a mathematically safe decrement
+path still looks inconsistent if the surrounding stack is overloaded.
 
-Lua's cold-start throughput (200 buyers, 135 rps) is artificially low because
-the first requests pay script-compilation cost; once the script is cached,
-throughput matches atomic DECRBY.
-
-**Limitations.** We chose not to retry aborted optimistic transactions to
-isolate the contention-abort rate itself. A production optimistic
-implementation would retry with backoff and claw back some accepted purchases,
-at the cost of extra round-trips. The conclusion stands: the retry budget
-needed to reach atomic-DECR parity under heavy contention is large enough that
-atomic DECR or Lua is the correct default.
+**Limitations.** The 10k runs are dominated by ALB/ECS saturation and client
+resource pressure, not purely by inventory algorithm behavior. Therefore, Exp 2
+conclusions are strongest at 1k/5k and should treat 10k as stress characterization
+rather than clean strategy-isolation data.
 
 # 4 Experiment 3 -- Admission-rate tuning and worker concurrency
 

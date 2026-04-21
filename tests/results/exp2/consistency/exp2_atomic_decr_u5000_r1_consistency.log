@@ -1,0 +1,21 @@
+------------------------------------------------------------
+  Flash Sale - Post-Experiment Consistency Check
+------------------------------------------------------------
+  Timestamp:        2026-04-21 13:02:49 UTC
+  Item ID:          flash-sale-item
+  Inventory count:  5000
+  API base URL:     http://flash-sale-alb-1094041189.us-east-1.elb.amazonaws.com
+  DynamoDB tables:  flash-sale-orders, flash-sale-inventory
+
+  Results:
+    Redis remaining inventory:     0
+    DynamoDB confirmed_orders:     5000 (abs=29030, baseline=24030)
+    -------------------------------------
+    Sum (should == 5000):          5000
+    DynamoDB order record count:   5000 (abs=29030, baseline=24030)
+
+CONSISTENT — invariant holds
+     0 remaining + 5000 confirmed = 5000
+
+  Full result saved to: consistency_result.json
+------------------------------------------------------------

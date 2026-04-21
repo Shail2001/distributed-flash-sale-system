@@ -1,0 +1,7 @@
+Method,Name,Error,Occurrences
+GET,GET /inventory,RemoteDisconnected('Remote end closed connection without response'),1
+POST,POST /purchase,CatchResponseError('unexpected status=0 body='),23
+POST,POST /purchase,"CatchResponseError('unexpected status=500 body={""error"":""redis error""}')",683
+GET,GET /inventory,HTTPError('504 Server Error: Gateway Time-out for url: GET /inventory'),5806
+POST,POST /purchase,CatchResponseError('unexpected status=504 body=<html>\r\n<head><title>504 Gateway Time-out</title></head>\r\n<body>\r\n<center><h1>504 Gateway Time-out</h1></center>\r\n</body>\r\n</html>\r\n'),23748
+GET,GET /inventory,HTTPError('500 Server Error: Internal Server Error for url: GET /inventory'),169

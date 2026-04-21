@@ -1,0 +1,5 @@
+Method,Name,Error,Occurrences
+POST,POST /purchase,"CatchResponseError('unexpected status=500 body={""error"":""redis error""}')",59641
+GET,GET /inventory,HTTPError('504 Server Error: Gateway Time-out for url: GET /inventory'),509
+POST,POST /purchase,CatchResponseError('unexpected status=504 body=<html>\r\n<head><title>504 Gateway Time-out</title></head>\r\n<body>\r\n<center><h1>504 Gateway Time-out</h1></center>\r\n</body>\r\n</html>\r\n'),2546
+GET,GET /inventory,HTTPError('500 Server Error: Internal Server Error for url: GET /inventory'),14620

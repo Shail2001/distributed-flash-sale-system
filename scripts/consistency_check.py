@@ -28,6 +28,7 @@ Exit codes:
 import os
 import sys
 import json
+import urllib.request
 from datetime import datetime, timezone
 
 # Dependencies
@@ -44,14 +45,19 @@ def load_config():
         "aws_region":       os.environ.get("AWS_REGION", ""),
         "redis_endpoint":   os.environ.get("REDIS_ENDPOINT", ""),
         "redis_port":       int(os.environ.get("REDIS_PORT", "6379")),
+        "api_base_url":     os.environ.get("API_BASE_URL", ""),
         "dynamodb_table":   os.environ.get("DYNAMODB_TABLE", ""),
         "inventory_table":  os.environ.get("INVENTORY_TABLE", ""),
         "inventory_count":  int(os.environ.get("INVENTORY_COUNT", "100")),
+        "baseline_confirmed": int(os.environ.get("BASELINE_CONFIRMED", "0")),
+        "baseline_order_count": int(os.environ.get("BASELINE_ORDER_COUNT", "0")),
         "item_id":          os.environ.get("ITEM_ID", "flash-sale-item"),
     }
 
-    missing = [k for k in ("aws_region", "redis_endpoint", "dynamodb_table", "inventory_table")
+    missing = [k for k in ("aws_region", "dynamodb_table", "inventory_table")
                if not cfg[k]]
+    if not cfg["redis_endpoint"] and not cfg["api_base_url"]:
+        missing.append("redis_endpoint or api_base_url")
     if missing:
         print(f"ERROR: Missing required environment variables: {', '.join(missing).upper()}")
         sys.exit(2)
@@ -76,6 +82,19 @@ def get_redis_inventory(cfg):
         return max(0, int(val))  # clamp to 0; counter can be briefly negative during races
     except redis.ConnectionError as e:
         print(f"ERROR: Cannot connect to Redis at {cfg['redis_endpoint']}:{cfg['redis_port']}: {e}")
+        sys.exit(2)
+
+def get_api_inventory(cfg):
+    if not cfg["api_base_url"]:
+        print("ERROR: API_BASE_URL not provided for API inventory check")
+        sys.exit(2)
+    try:
+        url = f"{cfg['api_base_url'].rstrip('/')}/inventory"
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+            return max(0, int(payload.get("remaining", 0)))
+    except Exception as e:
+        print(f"ERROR: API inventory query failed: {e}")
         sys.exit(2)
 
 # DynamoDB
@@ -123,24 +142,38 @@ def run_check(cfg):
     print(f"  Timestamp:        {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
     print(f"  Item ID:          {cfg['item_id']}")
     print(f"  Inventory count:  {cfg['inventory_count']}")
-    print(f"  Redis:            {cfg['redis_endpoint']}:{cfg['redis_port']}")
+    if cfg["redis_endpoint"]:
+        print(f"  Redis:            {cfg['redis_endpoint']}:{cfg['redis_port']}")
+    if cfg["api_base_url"]:
+        print(f"  API base URL:     {cfg['api_base_url']}")
     print(f"  DynamoDB tables:  {cfg['dynamodb_table']}, {cfg['inventory_table']}")
     print()
 
-    redis_remaining    = get_redis_inventory(cfg)
-    dynamo_confirmed   = get_dynamodb_confirmed_orders(cfg)
-    dynamo_order_count = get_dynamodb_order_count(cfg)
+    if cfg["redis_endpoint"]:
+        redis_remaining = get_redis_inventory(cfg)
+        inventory_source = "redis"
+    else:
+        redis_remaining = get_api_inventory(cfg)
+        inventory_source = "api_inventory"
+
+    dynamo_confirmed_abs   = get_dynamodb_confirmed_orders(cfg)
+    dynamo_order_count_abs = get_dynamodb_order_count(cfg)
     inventory_count    = cfg["inventory_count"]
+
+    dynamo_confirmed = max(0, dynamo_confirmed_abs - cfg["baseline_confirmed"])
+    dynamo_order_count = None
+    if dynamo_order_count_abs is not None:
+        dynamo_order_count = max(0, dynamo_order_count_abs - cfg["baseline_order_count"])
 
     total = redis_remaining + dynamo_confirmed
 
     print("  Results:")
     print(f"    Redis remaining inventory:     {redis_remaining}")
-    print(f"    DynamoDB confirmed_orders:     {dynamo_confirmed}")
+    print(f"    DynamoDB confirmed_orders:     {dynamo_confirmed} (abs={dynamo_confirmed_abs}, baseline={cfg['baseline_confirmed']})")
     print(f"    -------------------------------------")
     print(f"    Sum (should == {inventory_count}):          {total}")
     if dynamo_order_count is not None:
-        print(f"    DynamoDB order record count:   {dynamo_order_count}")
+        print(f"    DynamoDB order record count:   {dynamo_order_count} (abs={dynamo_order_count_abs}, baseline={cfg['baseline_order_count']})")
     print()
 
     # Invariant checks
@@ -184,10 +217,15 @@ def run_check(cfg):
     result = {
         "timestamp":           datetime.now(timezone.utc).isoformat(),
         "item_id":             cfg["item_id"],
+        "inventory_source":    inventory_source,
         "inventory_count":     inventory_count,
+        "baseline_confirmed":  cfg["baseline_confirmed"],
+        "baseline_order_count": cfg["baseline_order_count"],
         "redis_remaining":     redis_remaining,
         "dynamo_confirmed":    dynamo_confirmed,
+        "dynamo_confirmed_abs": dynamo_confirmed_abs,
         "dynamo_order_count":  dynamo_order_count,
+        "dynamo_order_count_abs": dynamo_order_count_abs,
         "sum":                 total,
         "consistent":          passed,
         "issues":              issues,

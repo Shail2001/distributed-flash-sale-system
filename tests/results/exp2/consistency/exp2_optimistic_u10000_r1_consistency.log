@@ -1,0 +1,41 @@
+------------------------------------------------------------
+  Flash Sale - Post-Experiment Consistency Check
+------------------------------------------------------------
+  Timestamp:        2026-04-21 14:43:42 UTC
+  Item ID:          flash-sale-item
+  Inventory count:  5000
+  API base URL:     http://flash-sale-alb-1094041189.us-east-1.elb.amazonaws.com
+  DynamoDB tables:  flash-sale-orders, flash-sale-inventory
+
+ERROR: API inventory query failed: HTTP Error 503: Service Temporarily Unavailable
+------------------------------------------------------------
+  Flash Sale - Post-Experiment Consistency Check
+------------------------------------------------------------
+  Timestamp:        2026-04-21 14:44:02 UTC
+  Item ID:          flash-sale-item
+  Inventory count:  5000
+  API base URL:     http://flash-sale-alb-1094041189.us-east-1.elb.amazonaws.com
+  DynamoDB tables:  flash-sale-orders, flash-sale-inventory
+
+ERROR: API inventory query failed: HTTP Error 503: Service Temporarily Unavailable
+------------------------------------------------------------
+  Flash Sale - Post-Experiment Consistency Check
+------------------------------------------------------------
+  Timestamp:        2026-04-21 14:44:23 UTC
+  Item ID:          flash-sale-item
+  Inventory count:  5000
+  API base URL:     http://flash-sale-alb-1094041189.us-east-1.elb.amazonaws.com
+  DynamoDB tables:  flash-sale-orders, flash-sale-inventory
+
+  Results:
+    Redis remaining inventory:     1249
+    DynamoDB confirmed_orders:     3574 (abs=110098, baseline=106524)
+    -------------------------------------
+    Sum (should == 5000):          4823
+    DynamoDB order record count:   3574 (abs=110098, baseline=106524)
+
+INCONSISTENT — invariant violated:
+ DATA LOSS: sum=4823 is 177 less than INVENTORY_COUNT=5000
+
+  Full result saved to: consistency_result.json
+------------------------------------------------------------

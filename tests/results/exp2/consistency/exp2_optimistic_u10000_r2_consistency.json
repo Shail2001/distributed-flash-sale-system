@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-04-21T15:15:17.827508+00:00",
+  "item_id": "flash-sale-item",
+  "inventory_source": "api_inventory",
+  "inventory_count": 5000,
+  "baseline_confirmed": 0,
+  "baseline_order_count": 0,
+  "redis_remaining": 0,
+  "dynamo_confirmed": 5080,
+  "dynamo_confirmed_abs": 5080,
+  "dynamo_order_count": 5080,
+  "dynamo_order_count_abs": 5080,
+  "sum": 5080,
+  "consistent": false,
+  "issues": [
+    "OVERSELL: sum=5080 exceeds INVENTORY_COUNT=5000 by 80"
+  ]
+}
