@@ -13,8 +13,8 @@ const (
 	defaultMaxMessagesPerReceive = 10
 	defaultVisibilityTimeoutSecs = 60
 	defaultMetricsInterval       = 30 * time.Second
-	defaultRetryAttempts         = 3
-	defaultRetryBaseDelay        = 200 * time.Millisecond
+	defaultRetryAttempts         = 5                  // increased from 3 — handles TransactionConflict bursts
+	defaultRetryBaseDelay        = 100 * time.Millisecond // reduced from 200ms — jitter spreads retries, base can be tighter
 	defaultIdleSleep             = 500 * time.Millisecond
 )
 

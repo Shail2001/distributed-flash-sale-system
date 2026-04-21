@@ -1,14 +1,13 @@
 # Distributed Flash Sale Platform
 # CS6650 Final Project
 #
-# Cost optimisation: NAT Gateway removed — all services run in public subnets.
-# Security groups enforce access control instead of subnet placement.
-# Saves ~$35/month vs private subnet + NAT gateway setup.
-#
 # Experiment sweep variables (no container rebuild needed):
-#   var.inventory_count          — fixed at 100
-#   var.order_worker_goroutines  — Experiment 3: sweep 20/40/80
-#   var.admission_rate           — Experiment 3: sweep 2→100/s
+#   var.inventory_count               — 500 for Experiment 3
+#   var.order_worker_goroutines       — Experiment 3: sweep 20/40/80
+#   var.admission_rate                — Experiment 3: sweep 2→100/s
+#   var.flash_sale_api_desired_count  — 4 tasks
+#   var.order_worker_desired_count    — 4 tasks
+#   var.waiting_room_desired_count    — 2 tasks
 
 module "network" {
   source  = "./modules/network"
@@ -62,14 +61,18 @@ module "ecs" {
 
   flash_sale_api_image = "${module.ecr.flash_sale_api_repo_url}:latest"
   order_worker_image   = "${module.ecr.order_worker_repo_url}:latest"
-  waiting_room_image = "${module.ecr.waiting_room_repo_url}:latest"
+  waiting_room_image   = "${module.ecr.waiting_room_repo_url}:latest"
 
   flash_sale_api_target_group_arn = module.alb.flash_sale_api_target_group_arn
-  waiting_room_target_group_arn = module.alb.waiting_room_target_group_arn
+  waiting_room_target_group_arn   = module.alb.waiting_room_target_group_arn
 
   inventory_count         = var.inventory_count
   order_worker_goroutines = var.order_worker_goroutines
   admission_rate          = var.admission_rate
+
+  flash_sale_api_desired_count = var.flash_sale_api_desired_count
+  order_worker_desired_count   = var.order_worker_desired_count
+  waiting_room_desired_count   = var.waiting_room_desired_count
 
   redis_endpoint           = module.redis.redis_endpoint
   sqs_queue_url            = module.sqs.orders_queue_url
@@ -79,5 +82,5 @@ module "ecs" {
 
   flash_sale_api_log_group = module.logging.flash_sale_api_log_group
   order_worker_log_group   = module.logging.order_worker_log_group
-  waiting_room_log_group = module.logging.waiting_room_log_group
+  waiting_room_log_group   = module.logging.waiting_room_log_group
 }

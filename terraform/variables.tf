@@ -23,15 +23,14 @@ variable "order_worker_image" {
   default = "125878857213.dkr.ecr.us-east-1.amazonaws.com/flash-sale-order-worker:latest"
 }
 
-# Waiting room image — uncomment when service is built
-# variable "waiting_room_image" {
-#   type    = string
-#   default = "125878857213.dkr.ecr.us-east-1.amazonaws.com/flash-sale-waiting-room:latest"
-# }
+variable "waiting_room_image" {
+  type    = string
+  default = "125878857213.dkr.ecr.us-east-1.amazonaws.com/flash-sale-waiting-room:latest"
+}
 
 variable "inventory_count" {
   type        = number
-  default     = 100
+  default     = 500
   description = "Number of items available in the flash sale"
 }
 
@@ -45,4 +44,22 @@ variable "order_worker_goroutines" {
   type        = number
   default     = 20
   description = "Number of goroutines in order worker (Experiment 3 sweep variable)"
+}
+
+variable "flash_sale_api_desired_count" {
+  type        = number
+  default     = 4
+  description = "Number of Flash Sale API ECS tasks"
+}
+
+variable "order_worker_desired_count" {
+  type        = number
+  default     = 4
+  description = "Number of Order Worker ECS tasks"
+}
+
+variable "waiting_room_desired_count" {
+  type        = number
+  default     = 2
+  description = "Number of Waiting Room ECS tasks"
 }

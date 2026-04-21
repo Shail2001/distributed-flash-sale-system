@@ -49,7 +49,7 @@ resource "aws_ecs_service" "flash_sale_api" {
   name            = "${var.project}-api"
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.flash_sale_api.arn
-  desired_count   = 1
+  desired_count   = var.flash_sale_api_desired_count
   launch_type     = "FARGATE"
 
   network_configuration {
@@ -105,7 +105,7 @@ resource "aws_ecs_service" "order_worker" {
   name            = "${var.project}-order-worker"
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.order_worker.arn
-  desired_count   = 1
+  desired_count   = var.order_worker_desired_count
   launch_type     = "FARGATE"
 
   network_configuration {
@@ -119,7 +119,7 @@ resource "aws_ecs_service" "order_worker" {
   }
 }
 
-# ── Waiting Room ───────────────
+# ── Waiting Room ───────────────────────────────────────────────────────────────
 resource "aws_ecs_task_definition" "waiting_room" {
   family                   = "${var.project}-waiting-room"
   network_mode             = "awsvpc"
@@ -128,17 +128,20 @@ resource "aws_ecs_task_definition" "waiting_room" {
   memory                   = "512"
   execution_role_arn       = data.aws_iam_role.lab_role.arn
   task_role_arn            = data.aws_iam_role.lab_role.arn
+
   container_definitions = jsonencode([{
     name      = "waiting-room"
     image     = var.waiting_room_image
     essential = true
     portMappings = [{ containerPort = 8080 }]
     environment = [
-      { name = "REDIS_ENDPOINT", value = var.redis_endpoint },
-      { name = "REDIS_PORT",     value = "6379" },
-      { name = "ADMISSION_RATE", value = tostring(var.admission_rate) },
-      { name = "AWS_REGION",     value = var.aws_region },
-      { name = "APP_PORT",       value = "8080" },
+      { name = "REDIS_ENDPOINT",  value = var.redis_endpoint },
+      { name = "REDIS_PORT",      value = "6379" },
+      { name = "ADMISSION_RATE",  value = tostring(var.admission_rate) },
+      { name = "QUEUE_STRATEGY",  value = "timestamp_incr" },
+      { name = "ITEM_ID",         value = "flash-sale-item" },
+      { name = "AWS_REGION",      value = var.aws_region },
+      { name = "APP_PORT",        value = "8080" },
     ]
     logConfiguration = {
       logDriver = "awslogs"
@@ -155,19 +158,24 @@ resource "aws_ecs_service" "waiting_room" {
   name            = "${var.project}-waiting-room"
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.waiting_room.arn
-  desired_count   = 1
+  desired_count   = var.waiting_room_desired_count
   launch_type     = "FARGATE"
+
   network_configuration {
     subnets          = var.subnet_ids
     security_groups  = [var.ecs_security_group_id]
     assign_public_ip = true
   }
+
   load_balancer {
     target_group_arn = var.waiting_room_target_group_arn
     container_name   = "waiting-room"
     container_port   = 8080
   }
-  lifecycle { ignore_changes = [desired_count] }
+
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
 }
 
 # ── Auto Scaling — Flash Sale API (CPU) ────────────────────────────────────────
